@@ -3,7 +3,7 @@
 class DatabaseService {
     constructor() {
         // To use REAL Firebase, initialize here with your config
-        this.useRealFirebase = false; 
+        this.useRealFirebase = false;
         this.db = null;
         this.auth = null;
 
@@ -55,14 +55,20 @@ class DatabaseService {
             // Mock saving to DB
             return new Promise((resolve) => {
                 setTimeout(() => {
-                    console.log("Mock saved booking:", data);
+                    console.log("Saving booking to Persistent DB:", data);
                     const newBooking = { id: Date.now(), status: 'pending', ...data };
+
+                    if (window.db) {
+                        window.db.bookings.push(newBooking);
+                        if (window.saveDB) window.saveDB();
+                    }
+
                     // Trigger mock listener
-                    if(this.mockListener) {
+                    if (this.mockListener) {
                         this.mockListener([{ type: 'added', data: newBooking }]);
                     }
                     resolve(newBooking);
-                }, 800);
+                }, 500);
             });
         }
     }
