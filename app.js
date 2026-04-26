@@ -155,18 +155,29 @@ class App {
     addProduct() {
         const name = prompt("أدخل اسم المنتج الجديد:");
         const price = prompt("أدخل سعر المنتج (بالدينار):");
-        const imgUrl = prompt("أدخل رابط صورة المنتج (أو اتركه فارغاً لوضع صورة افتراضية):");
 
         if (name && price) {
+            window.tempProductName = name;
+            window.tempProductPrice = price;
+            document.getElementById('product-image-upload').click();
+        }
+    }
+
+    handleProductImageUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            const base64Image = e.target.result;
             const barberId = parseInt(localStorage.getItem('barbergo_session').split('_')[1]);
-            const finalImgUrl = imgUrl || "https://images.unsplash.com/photo-1599305090598-fe179d501227?w=500&q=60";
 
             const newProduct = {
                 id: Date.now(),
                 barber_id: barberId,
-                name: name,
-                price: parseFloat(price),
-                image: finalImgUrl
+                name: window.tempProductName,
+                price: parseFloat(window.tempProductPrice),
+                image: base64Image
             };
 
             db.products.push(newProduct);
@@ -183,33 +194,56 @@ class App {
                 </div>`;
                 container.innerHTML += html;
             }
-            window.notifier.show("تمت الإضافة", `تم إضافة ${name} إلى المتجر بنجاح.`, "success");
-        }
+            window.notifier.show("تمت الإضافة", `تم إضافة ${window.tempProductName} إلى المتجر بنجاح.`, "success");
+
+            // Clean up
+            event.target.value = '';
+            delete window.tempProductName;
+            delete window.tempProductPrice;
+        };
+        reader.readAsDataURL(file);
     }
 
-    addGalleryImage() {
-        const imgUrl = prompt("أدخل رابط الصورة لمعرض الأعمال (يجب أن يكون رابط إنترنت صحيح):");
-        if (imgUrl) {
+    handleImageUpload(event, type) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            const base64Image = e.target.result;
             const barberId = parseInt(localStorage.getItem('barbergo_session').split('_')[1]);
             const barber = db.barbers.find(b => b.id === barberId);
 
-            if (barber) {
-                if (!barber.gallery) barber.gallery = [];
-                barber.gallery.push(imgUrl);
-                window.saveDB();
-            }
+            if (!barber) return;
 
-            const container = document.getElementById('gallery-images-list');
-            if (container) {
-                const html = `
-                <div style="position: relative;">
-                    <button class="btn btn-ghost text-danger p-1" style="position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.6); border-radius: 50%; z-index: 2;" onclick="this.parentElement.remove()"><i class="fa-solid fa-xmark"></i></button>
-                    <img src="${imgUrl}" style="width: 100%; height: 100px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border-color);">
-                </div>`;
-                container.innerHTML += html;
+            if (type === 'cover') {
+                barber.image = base64Image; // save as cover
+                window.saveDB();
+                window.notifier.show("تم الرفع", "تم رفع صورة الغلاف بنجاح ومزامنتها.", "success");
+
+                const statusDiv = document.getElementById('cover-upload-status');
+                if (statusDiv) statusDiv.innerHTML = '<span class="text-success"><i class="fa-solid fa-check"></i> تم رفع الصورة وجاهزة للحفظ</span>';
+
+            } else if (type === 'gallery') {
+                if (!barber.gallery) barber.gallery = [];
+                barber.gallery.push(base64Image);
+                window.saveDB();
+
+                const container = document.getElementById('gallery-images-list');
+                if (container) {
+                    const html = `
+                    <div style="position: relative;">
+                        <button class="btn btn-ghost text-danger p-1" style="position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.6); border-radius: 50%; z-index: 2;" onclick="this.parentElement.remove()"><i class="fa-solid fa-xmark"></i></button>
+                        <img src="${base64Image}" style="width: 100%; height: 100px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border-color);">
+                    </div>`;
+                    container.innerHTML += html;
+                }
+                window.notifier.show("تم الرفع", "تم إضافة الصورة بنجاح إلى معرض أعمالك المحفوظ.", "success");
             }
-            window.notifier.show("تم الرفع", "تم إضافة الصورة بنجاح إلى معرض أعمالك المحفوظ.", "success");
-        }
+            // Clear input
+            event.target.value = '';
+        };
+        reader.readAsDataURL(file);
     }
 
     toggleBlockTime(element) {
@@ -605,8 +639,64 @@ class App {
                 btnElement.innerHTML = '<i class="fa-solid fa-lock-open"></i> تفعيل';
                 window.notifier.show("تم التفعيل", `تم إعادة تفعيل حساب ${barber.name}.`, "success");
             }
+            window.saveDB();
         }
     }
+
+    deleteBarber(id) {
+        const confirmed = confirm("هل أنت متأكد من حذف هذا الحلاق بشكل نهائي؟ هذا الإجراء لا يمكن التراجع عنه وسيحذف كافة بياناته وحجوزاته!");
+        if (confirmed) {
+            const index = window.db.barbers.findIndex(b => b.id === id);
+            if (index > -1) {
+                const bName = window.db.barbers[index].name;
+                window.db.barbers.splice(index, 1);
+                window.db.products = window.db.products.filter(p => p.barber_id !== id);
+                window.db.services = window.db.services.filter(s => s.barber_id !== id);
+                window.saveDB();
+                window.notifier.show("تم الحذف", `تم حذف بيانات الحلاق ${bName} كلياً من النظام.`, "error");
+                this.navigate('adminDashboard'); // Refresh view
+            }
+        }
+    }
+
+    saveBarberSettings() {
+        const barberId = parseInt(localStorage.getItem('barbergo_session').split('_')[1]);
+        const barber = window.db.barbers.find(b => b.id === barberId);
+
+        if (barber) {
+            barber.name = document.getElementById('barber-edit-name').value;
+            barber.bio = document.getElementById('barber-edit-bio').value;
+            barber.phone = document.getElementById('barber-edit-phone').value;
+            barber.location = document.getElementById('barber-edit-location').value;
+
+            window.saveDB();
+            window.notifier.show("تم الحفظ", "تم حفظ وتحديث إعدادات ملفك الشخصي بنجاح.", "success");
+        }
+    }
+
+    toggleBarberSettingParam(btnElement, paramKey) {
+        const barberId = parseInt(localStorage.getItem('barbergo_session').split('_')[1]);
+        const barber = window.db.barbers.find(b => b.id === barberId);
+        if (!barber) return;
+
+        if (!barber.settings) barber.settings = {};
+
+        if (paramKey === 'enableEmergency') {
+            barber.settings.enableEmergency = !barber.settings.enableEmergency;
+            const state = barber.settings.enableEmergency;
+            btnElement.className = \`btn \${state ? 'btn-success' : 'btn-ghost text-muted'}\`;
+            btnElement.innerHTML = state ? '<i class="fa-solid fa-toggle-on"></i> مفعل' : '<i class="fa-solid fa-toggle-off"></i> معطل';
+            window.notifier.show("تم التحديث", \`تم \${state ? 'تفعيل' : 'تعطيل'} زر اتصال الطوارئ.\`, "info");
+        } else if (paramKey === 'homeService') {
+            barber.homeService = !barber.homeService;
+            const state = barber.homeService;
+            btnElement.className = \`btn \${state ? 'btn-primary' : 'btn-ghost text-muted'}\`;
+            btnElement.innerHTML = state ? '<i class="fa-solid fa-toggle-on"></i> متاح' : '<i class="fa-solid fa-toggle-off"></i> غير متاح';
+            window.notifier.show("تم التحديث", \`تم \${state ? 'تفعيل' : 'تعطيل'} خدمة الحلاقة المنزلية.\`, "info");
+        }
+        window.saveDB();
+    }
+
 
     savePayoutDetails() {
         const iban = document.getElementById('admin-iban').value;
