@@ -32,6 +32,10 @@ const UI = {
                         <i class="fa-solid fa-gear"></i>
                         <span>الإعدادات</span>
                     </div>
+                    <div class="nav-item ${activeTab === 'bookings' ? 'active' : ''}" onclick="app.navigate('clientBookings')">
+                        <i class="fa-solid fa-calendar-check"></i>
+                        <span>مواعيدي</span>
+                    </div>
                     <div class="nav-center-action" onclick="app.navigate('aiCamera')">
                         <i class="fa-solid fa-scissors"></i>
                     </div>
@@ -47,6 +51,64 @@ const UI = {
     // ==========================================
     // 1. Client Features
     // ==========================================
+    renderClientBookings() {
+        const clientName = localStorage.getItem('barbergo_client_name') || null;
+        let myBookingsHTML = '';
+
+        if (!clientName) {
+            myBookingsHTML = `
+                <div class="pill-box text-center mt-5">
+                    <i class="fa-regular fa-calendar-xmark text-muted mb-3" style="font-size: 3rem;"></i>
+                    <h4 class="text-white">لا توجد مواعيد</h4>
+                    <p class="text-muted" style="font-size: 0.9rem;">أنت لم تقم بأي حجز بعد باستخدام هذا الجهاز.</p>
+                    <button class="btn btn-primary mt-3 w-100" onclick="app.navigate('clientHome')">احجز الآن</button>
+                </div>
+            `;
+        } else {
+            const clientBookings = db.bookings.filter(b => b.customer_name === clientName);
+            if (clientBookings.length === 0) {
+                myBookingsHTML = `
+                    <div class="pill-box text-center mt-5">
+                        <i class="fa-regular fa-calendar-xmark text-muted mb-3" style="font-size: 3rem;"></i>
+                        <h4 class="text-white">لا توجد مواعيد حالية</h4>
+                        <button class="btn btn-primary mt-3 w-100" onclick="app.navigate('clientHome')">احجز الآن</button>
+                    </div>
+                `;
+            } else {
+                myBookingsHTML = clientBookings.map(b => {
+                    const barber = db.barbers.find(barb => barb.id === b.barber_id);
+                    // Check logic for cancellation (assume the booked date is today for UI logic)
+                    // If booking time logic: allow cancel if time left is > 1 hour. We simulate this logic simply:
+                    return `
+                    <div class="pill-box mb-3 d-flex justify-content-between align-items-center" style="border-left: 3px solid ${b.status === 'cancelled' ? '#e74c3c' : 'var(--gold-primary)'};">
+                        <div class="text-right">
+                            <h4 class="m-0 text-white">${barber ? barber.name : 'صالون'}</h4>
+                            <div class="text-muted mt-1" style="font-size: 0.85rem;"><i class="fa-regular fa-clock"></i> الوقت: ${b.time}</div>
+                            <div class="mt-1" style="font-size: 0.85rem; color: ${b.status === 'cancelled' ? '#e74c3c' : '#2ecc71'};">
+                                <i class="fa-solid fa-circle-check"></i> ${b.status === 'cancelled' ? 'تم الإلغاء' : 'مؤكد'}
+                            </div>
+                        </div>
+                        ${b.status !== 'cancelled' ? `
+                        <button class="btn btn-outline text-danger p-2" style="border-color: #e74c3c; font-size: 0.8rem;" onclick="app.cancelClientBooking(${b.id})">
+                            <i class="fa-solid fa-xmark"></i> إلغاء
+                        </button>
+                        ` : ''}
+                    </div>
+                    `;
+                }).join('');
+            }
+        }
+
+        return `
+            ${this.renderTopHeader('مواعيدي')}
+            <div class="page container py-4" style="padding-bottom: 100px;">
+                <h3 class="text-right mb-4 text-gold">سجل حجوزاتك <i class="fa-solid fa-clock-rotate-left"></i></h3>
+                ${myBookingsHTML}
+            </div>
+            ${this.renderBottomNav('bookings')}
+        `;
+    },
+
     renderClientHome() {
         // Sort barbers so that favorites are on top
         const sortedBarbers = [...db.barbers].sort((a, b) => {
@@ -77,7 +139,9 @@ const UI = {
                     <div class="search-bar mb-4 d-flex align-items-center p-1" style="background: var(--bg-card); border: 2px solid var(--gold-primary); border-radius: var(--radius-lg); box-shadow: var(--shadow-gold);">
                         <button class="location-btn btn btn-ghost" style="border-radius: 50%; padding: 10px;" onclick="app.requestLocation()"><i class="fa-solid fa-location-dot"></i></button>
                         <input type="text" class="form-control" style="background: transparent; border: none; flex: 1; padding: 10px; color: #fff; text-align: right; outline: none; font-size: 1rem;" placeholder="ابحث باسم الحلاق أو بالصوت ...">
-                        <button class="voice-btn btn btn-primary" style="border-radius: 50%; width: 50px; height: 50px; padding: 0;" onclick="app.simulateNotification()"><i class="fa-solid fa-microphone"></i></button>
+                        <button class="voice-btn btn btn-primary" style="border-radius: 50%; width: 50px; height: 50px; padding: 0;" onclick="app.startVoiceSearch(this)">
+                            <i class="fa-solid fa-microphone"></i>
+                        </button>
                     </div>
                     <h3 class="mb-3 text-right">صالونات مقترحة لك</h3>
                     <div class="barbers-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
@@ -109,7 +173,7 @@ const UI = {
 
         const activeBookingsCount = db.bookings.filter(b => b.barber_id === barberId).length;
         const isCrowded = activeBookingsCount >= 2; // Threshold for demo
-        const crowdHtml = isCrowded 
+        const crowdHtml = isCrowded
             ? `<div class="pill-box mb-3 text-center mx-auto" style="border: 1px solid var(--gold-primary); background: rgba(212,175,55,0.05); padding: 10px; max-width: 80%;"><h4 class="m-0 text-gold" style="font-size: 0.95rem;"><i class="fa-solid fa-fire"></i> الوضع الحالي: مزدحم 🔥</h4></div>`
             : `<div class="pill-box mb-3 text-center mx-auto" style="border: 1px solid var(--gold-primary); background: rgba(212,175,55,0.05); padding: 10px; max-width: 80%;"><h4 class="m-0 text-gold" style="font-size: 0.95rem;"><i class="fa-regular fa-circle-check"></i> الوضع الحالي: هادئ - وقت مثالي 🟢</h4></div>`;
 
@@ -158,11 +222,12 @@ const UI = {
                     </div>
 
                     ${barber.settings.enableEmergency ? `
-                        <div class="pill-box cursor-pointer" style="border: 1px solid #e74c3c; background: rgba(231, 76, 60, 0.1);" onclick="app.triggerEmergency()">
+                        <a href="tel:${barber.phone || '0790000000'}" class="pill-box text-decoration-none d-block cursor-pointer mb-3 text-center" style="border: 2px solid #e74c3c; background: rgba(231, 76, 60, 0.1);">
                             <h3 class="text-danger m-0 d-flex justify-content-center align-items-center gap-2">
-                                <i class="fa-solid fa-truck-medical"></i> طلب حجز طارئ!
+                                <i class="fa-solid fa-phone-volume fa-shake"></i> اتصال طارئ بالحلاق!
                             </h3>
-                        </div>
+                            <p class="text-muted mt-2 mb-0" style="font-size: 0.8rem;">انقر هنا للاتصال والتنسيق المباشر (للحالات المستعجلة)</p>
+                        </a>
                     ` : ''}
 
                     <div class="tabs-container mt-4" style="overflow-x: auto; white-space: nowrap; flex-wrap: nowrap;">
@@ -256,16 +321,16 @@ const UI = {
                         <label class="text-gold mb-3 d-block" style="font-size: 1.1rem; font-weight: bold;">اختر الوقت المتاح (اليوم)</label>
                         <div class="schedule-grid">
                             ${(() => {
-                                const allSlots = ['10:00 ص','10:30 ص','11:00 ص','11:30 ص','12:00 م','12:30 م','01:00 م','01:30 م','02:00 م','02:30 م','03:00 م','03:30 م','04:00 م','04:30 م','05:00 م','05:30 م','06:00 م','06:30 م','07:00 م','07:30 م','08:00 م','08:30 م','09:00 م','09:30 م','10:00 م'];
-                                const bookedVisualSlots = ['11:00 ص', '12:00 م', '03:30 م', '06:00 م', '07:30 م']; // Mocked visual slots for demonstration based on the user's audio
-                                return allSlots.map(time => {
-                                    if (bookedVisualSlots.includes(time)) {
-                                        return `<div class="time-slot disabled" style="background: rgba(231,76,60,0.1); border: 1px dashed #e74c3c; color: #e74c3c; opacity: 0.7;" title="الوقت محجوز" onclick="app.simulateNotificationError('هذا الوقت محجوز مسبقاً')">${time}</div>`;
-                                    } else {
-                                        return `<div class="time-slot" onclick="app.selectTime(this)">${time}</div>`;
-                                    }
-                                }).join('');
-                            })()}
+                const allSlots = ['10:00 ص', '10:30 ص', '11:00 ص', '11:30 ص', '12:00 م', '12:30 م', '01:00 م', '01:30 م', '02:00 م', '02:30 م', '03:00 م', '03:30 م', '04:00 م', '04:30 م', '05:00 م', '05:30 م', '06:00 م', '06:30 م', '07:00 م', '07:30 م', '08:00 م', '08:30 م', '09:00 م', '09:30 م', '10:00 م'];
+                const bookedVisualSlots = ['11:00 ص', '12:00 م', '03:30 م', '06:00 م', '07:30 م']; // Mocked visual slots for demonstration based on the user's audio
+                return allSlots.map(time => {
+                    if (bookedVisualSlots.includes(time)) {
+                        return `<div class="time-slot disabled" style="background: rgba(231,76,60,0.1); border: 1px dashed #e74c3c; color: #e74c3c; opacity: 0.7;" title="الوقت محجوز" onclick="app.simulateNotificationError('هذا الوقت محجوز مسبقاً')">${time}</div>`;
+                    } else {
+                        return `<div class="time-slot" onclick="app.selectTime(this)">${time}</div>`;
+                    }
+                }).join('');
+            })()}
                         </div>
                     </div>
                     <button class="btn btn-primary btn-block mt-4" style="padding: 15px;" onclick="app.confirmBooking()">تأكيد الحجز (JOD ${service.price})</button>
@@ -300,8 +365,8 @@ const UI = {
             <div class="page container py-4 text-center">
                 <p class="text-gold mb-3" style="font-size: 0.9rem;"><i class="fa-solid fa-wand-magic-sparkles"></i> دع الذكاء الاصطناعي يقترح القصة الأنسب لملامحك</p>
                 <div class="camera-container border-gold" style="position: relative; overflow: hidden; border-radius: 12px; margin: 0 auto; max-width: 300px; height: 350px;">
-                    <!-- default face for camera simulation -->
-                    <img id="ai-camera-feed" src="https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=500&q=80" style="width: 100%; height: 100%; object-fit: cover;">
+                    <video id="ai-camera-feed" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; background: #111;"></video>
+                    <img id="ai-mock-result" style="display: none; width: 100%; height: 100%; object-fit: cover;">
                     <div id="ai-scan-line" class="scan-line"></div>
                 </div>
                 
@@ -626,7 +691,7 @@ const UI = {
                                 <div class="text-muted" style="font-size: 0.85rem;"><i class="fa-regular fa-clock"></i> اليوم, 04:30 م</div>
                             </div>
                             <div class="text-white mb-3" style="font-size: 0.9rem;"><i class="fa-solid fa-scissors text-muted"></i> قصة شعر مودرن مع سشوار</div>
-                            <button class="btn w-100 mt-2 text-danger" style="background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.3); font-weight: bold; padding: 10px;" onclick="app.cancelBookingAlert()">إلغاء الحجز وإرسال تنبيه للعميل</button>
+                            <button class="btn w-100 mt-2 text-danger" style="background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.3); font-weight: bold; padding: 10px;" onclick="app.cancelBookingAlert(this)">إلغاء الحجز وإرسال تنبيه للعميل</button>
                         </div>
                         
                         <div class="booking-item p-3" style="background: var(--bg-main); border: 1px solid var(--border-color); border-radius: var(--radius-sm); border-right: 3px solid #2ecc71;">
@@ -635,7 +700,7 @@ const UI = {
                                 <div class="text-muted" style="font-size: 0.85rem;"><i class="fa-regular fa-clock"></i> اليوم, 06:00 م</div>
                             </div>
                             <div class="text-white mb-3" style="font-size: 0.9rem;"><i class="fa-solid fa-scissors text-muted"></i> تنظيف بشرة كامل</div>
-                            <button class="btn w-100 mt-2 text-danger" style="background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.3); font-weight: bold; padding: 10px;" onclick="app.cancelBookingAlert()">إلغاء الحجز وإرسال تنبيه للعميل</button>
+                            <button class="btn w-100 mt-2 text-danger" style="background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.3); font-weight: bold; padding: 10px;" onclick="app.cancelBookingAlert(this)">إلغاء الحجز وإرسال تنبيه للعميل</button>
                         </div>
                     </div>
 
@@ -645,23 +710,23 @@ const UI = {
                         <p class="text-muted mb-3" style="font-size: 0.85rem; line-height: 1.5;">اضغط على أي وقت لتقوم بإغلاقه حتى وإن لم يكن هناك حجز مسبق، وسيظهر للعملاء كـ "غير متاح".</p>
                         <div class="schedule-grid" style="grid-template-columns: repeat(3, 1fr); gap: 8px;">
                             ${(() => {
-                                const allSlots = ['10:00 ص','10:30 ص','11:00 ص','11:30 ص','12:00 م','12:30 م','01:00 م','01:30 م','02:00 م','02:30 م','03:00 م','03:30 م','04:00 م','04:30 م','05:00 م','05:30 م','06:00 م','06:30 م','07:00 م','07:30 م','08:00 م','08:30 م','09:00 م','09:30 م','10:00 م'];
-                                const bookedVisualSlots = ['11:00 ص', '12:00 م', '03:30 م', '06:00 م', '07:30 م'];
-                                return allSlots.map(time => {
-                                    if (bookedVisualSlots.includes(time)) {
-                                        return `<div class="time-slot disabled" style="background: rgba(231,76,60,0.2); border: 1px dashed #e74c3c; color: #e74c3c; opacity: 1;" onclick="app.simulateNotificationError('حاول إلغاء الحجز من القائمة أولاً')">${time} (محجوز)</div>`;
-                                    } else {
-                                        return `<div class="time-slot" onclick="app.toggleBlockTime(this)">${time}</div>`;
-                                    }
-                                }).join('');
-                            })()}
+                const allSlots = ['10:00 ص', '10:30 ص', '11:00 ص', '11:30 ص', '12:00 م', '12:30 م', '01:00 م', '01:30 م', '02:00 م', '02:30 م', '03:00 م', '03:30 م', '04:00 م', '04:30 م', '05:00 م', '05:30 م', '06:00 م', '06:30 م', '07:00 م', '07:30 م', '08:00 م', '08:30 م', '09:00 م', '09:30 م', '10:00 م'];
+                const bookedVisualSlots = ['11:00 ص', '12:00 م', '03:30 م', '06:00 م', '07:30 م'];
+                return allSlots.map(time => {
+                    if (bookedVisualSlots.includes(time)) {
+                        return `<div class="time-slot disabled" style="background: rgba(231,76,60,0.2); border: 1px dashed #e74c3c; color: #e74c3c; opacity: 1;" onclick="app.simulateNotificationError('حاول إلغاء الحجز من القائمة أولاً')">${time} (محجوز)</div>`;
+                    } else {
+                        return `<div class="time-slot" onclick="app.toggleBlockTime(this)">${time}</div>`;
+                    }
+                }).join('');
+            })()}
                         </div>
                     </div>
                 </div>
 
                 <!-- Page 5: Store -->
                 <div id="bdash-content-5" class="bdash-content" style="display: none;">
-                     <div class="pill-box p-3 mb-4 text-center cursor-pointer" style="border: 2px dashed var(--gold-primary); background: rgba(212, 175, 55, 0.05);" onclick="app.simulateAddProduct()">
+                     <div class="pill-box p-3 mb-4 text-center cursor-pointer" style="border: 2px dashed var(--gold-primary); background: rgba(212, 175, 55, 0.05);" onclick="app.addProduct()">
                          <h4 class="text-gold m-0"><i class="fa-solid fa-box-open"></i> إضافة منتج جديد للمتجر</h4>
                          <div class="text-muted mt-1" style="font-size: 0.85rem;">أضف صورة واسم المنتج مع السعر لبيعه لعملائك</div>
                      </div>
@@ -684,7 +749,7 @@ const UI = {
 
                 <!-- Page 7: Gallery -->
                 <div id="bdash-content-7" class="bdash-content" style="display: none;">
-                    <div class="pill-box p-3 mb-4 text-center cursor-pointer" style="border: 2px dashed var(--gold-primary); background: rgba(212, 175, 55, 0.05);" onclick="app.simulateAddGalleryImage()">
+                    <div class="pill-box p-3 mb-4 text-center cursor-pointer" style="border: 2px dashed var(--gold-primary); background: rgba(212, 175, 55, 0.05);" onclick="app.addGalleryImage()">
                          <h4 class="text-gold m-0"><i class="fa-solid fa-images"></i> رفع صورة جديدة لمعرض الأعمال</h4>
                          <div class="text-muted mt-1" style="font-size: 0.85rem;">الصور تجذب العملاء الجدد بنسبة 70% أكثر</div>
                      </div>
@@ -832,11 +897,11 @@ const UI = {
         const barbers = db.barbers;
         const totalClients = db.users.filter(u => u.type === 'client').length;
         const adminData = db.adminSettings;
-        
+
         const barbersRows = barbers.map(b => {
             let subBadge = b.subscriptionStatus === 'active' ? '<span class="text-success p-1" style="background: rgba(46, 204, 113, 0.1); border-radius: 5px; font-size: 0.8rem;">نشط</span>' :
-                           b.subscriptionStatus === 'blocked' ? '<span class="text-danger p-1" style="background: rgba(231, 76, 60, 0.1); border-radius: 5px; font-size: 0.8rem;">محظور</span>' :
-                           '<span class="text-warning p-1" style="background: rgba(243, 156, 18, 0.1); border-radius: 5px; font-size: 0.8rem;">تجريبي</span>';
+                b.subscriptionStatus === 'blocked' ? '<span class="text-danger p-1" style="background: rgba(231, 76, 60, 0.1); border-radius: 5px; font-size: 0.8rem;">محظور</span>' :
+                    '<span class="text-warning p-1" style="background: rgba(243, 156, 18, 0.1); border-radius: 5px; font-size: 0.8rem;">تجريبي</span>';
 
             const isBlocked = b.subscriptionStatus === 'blocked';
             const actionBtn = `<button class="btn ${isBlocked ? 'btn-danger' : 'btn-primary'} text-white p-1 ml-2" style="font-size: 0.75rem; width: 80px;" onclick="app.toggleBarberStatus(${b.id}, this)">
