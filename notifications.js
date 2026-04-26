@@ -35,7 +35,7 @@ class NotificationManager {
 
         const toast = document.createElement('div');
         toast.className = `toast toast-${type}`;
-        
+
         let icon = 'fa-info-circle';
         if (type === 'success') icon = 'fa-check-circle';
         if (type === 'warning') icon = 'fa-exclamation-triangle';
@@ -64,8 +64,8 @@ class NotificationManager {
     // specific business logic methods
     notifyBookingConfirmed(customerName, time) {
         this.show(
-            "تأكيد حجز", 
-            `تم حجز موعدك بنجاح يا ${customerName} الساعة ${time}.`, 
+            "تأكيد حجز",
+            `تم حجز موعدك بنجاح يا ${customerName} الساعة ${time}.`,
             'success',
             true
         );
