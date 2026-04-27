@@ -684,15 +684,15 @@ class App {
         if (paramKey === 'enableEmergency') {
             barber.settings.enableEmergency = !barber.settings.enableEmergency;
             const state = barber.settings.enableEmergency;
-            btnElement.className = \`btn \${state ? 'btn-success' : 'btn-ghost text-muted'}\`;
+            btnElement.className = `btn ${state ? 'btn-success' : 'btn-ghost text-muted'}`;
             btnElement.innerHTML = state ? '<i class="fa-solid fa-toggle-on"></i> مفعل' : '<i class="fa-solid fa-toggle-off"></i> معطل';
-            window.notifier.show("تم التحديث", \`تم \${state ? 'تفعيل' : 'تعطيل'} زر اتصال الطوارئ.\`, "info");
+            window.notifier.show("تم التحديث", `تم ${state ? 'تفعيل' : 'تعطيل'} زر اتصال الطوارئ.`, "info");
         } else if (paramKey === 'homeService') {
             barber.homeService = !barber.homeService;
             const state = barber.homeService;
-            btnElement.className = \`btn \${state ? 'btn-primary' : 'btn-ghost text-muted'}\`;
+            btnElement.className = `btn ${state ? 'btn-primary' : 'btn-ghost text-muted'}`;
             btnElement.innerHTML = state ? '<i class="fa-solid fa-toggle-on"></i> متاح' : '<i class="fa-solid fa-toggle-off"></i> غير متاح';
-            window.notifier.show("تم التحديث", \`تم \${state ? 'تفعيل' : 'تعطيل'} خدمة الحلاقة المنزلية.\`, "info");
+            window.notifier.show("تم التحديث", `تم ${state ? 'تفعيل' : 'تعطيل'} خدمة الحلاقة المنزلية.`, "info");
         }
         window.saveDB();
     }
