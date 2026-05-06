@@ -659,6 +659,42 @@ class App {
         }
     }
 
+    manageBarberTrial(id) {
+        const barber = window.db.barbers.find(b => b.id === id);
+        if (barber) {
+            const days = prompt(`إدارة فترة التجربة للحلاق: ${barber.name}\n\nأدخل عدد الأيام التي تريد منحها كفترة تجريبية مجانية:`, "30");
+            if (days && !isNaN(days)) {
+                barber.subscriptionStatus = 'trial';
+                barber.trialDays = parseInt(days);
+                window.saveDB();
+                window.notifier.show("تم التحديث", `تم منح ${barber.name} فترة تجربة لمدة ${days} يوماً بنجاح.`, "success");
+                this.navigate('adminDashboard');
+            }
+        }
+    }
+
+    togglePublishProfile(btnElement) {
+        const barberId = parseInt(localStorage.getItem('barbergo_session').split('_')[1]);
+        const barber = window.db.barbers.find(b => b.id === barberId);
+        
+        if (!barber) return;
+
+        barber.isPublished = !barber.isPublished;
+        const state = barber.isPublished;
+        
+        btnElement.className = `btn ${state ? 'btn-success' : 'btn-outline-gold'} btn-block`;
+        btnElement.innerHTML = state ? '<i class="fa-solid fa-check-circle"></i> منشور وجاهز للاستقبال' : '<i class="fa-solid fa-upload"></i> نشر للعملاء الآن';
+        
+        window.saveDB();
+        
+        if (state) {
+            window.notifier.show("تم النشر", "تهانينا! بروفايلك الآن متاح للعملاء على المنصة ويمكنهم الحجز لديك.", "success");
+        } else {
+            window.notifier.show("تم إخفاء البروفايل", "تم سحب البروفايل من الصفحة الرئيسية، لن يتمكن العملاء الجدد من رؤيته.", "info");
+        }
+    }
+
+
     saveBarberSettings() {
         const barberId = parseInt(localStorage.getItem('barbergo_session').split('_')[1]);
         const barber = window.db.barbers.find(b => b.id === barberId);
