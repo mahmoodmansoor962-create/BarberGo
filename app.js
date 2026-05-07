@@ -16,6 +16,7 @@ class App {
         if (window.location.pathname.includes('admin.html')) {
             if (session === 'admin') {
                 this.navigate('adminDashboard');
+                window.notifier.show("مرحباً بك", "أهلاً بك مجدداً في لوحة تحكم الإدارة.", "success");
             } else {
                 this.navigate('adminLogin');
             }
@@ -26,9 +27,12 @@ class App {
             if (session.startsWith('barber_')) {
                 const bId = parseInt(session.split('_')[1]);
                 this.navigate('barberDashboard', { id: bId });
+                const bName = window.db.barbers.find(b => b.id === bId)?.name || 'أيها الحلاق';
+                window.notifier.show("مرحباً بك", `أهلاً بك مجدداً في لوحة التحكم الخاصة بك يا ${bName}.`, "success");
                 return;
             } else if (session === 'client') {
                 this.navigate('clientHome');
+                window.notifier.show("مرحباً بك", "أهلاً بك مجدداً في BarberGo. احجز موعدك الآن!", "success");
                 return;
             }
         }
@@ -454,6 +458,8 @@ class App {
 
             if (isNew) {
                 window.notifier.show("تم تفعيل حسابك", "تهانينا! لديك فترة تجربة مجانية لمدة 30 يوماً. قم بتعبئة بيانات صالونك الآن.", "success");
+            } else {
+                window.notifier.show("مرحباً بك", `أهلاً بك مجدداً في لوحة التحكم يا ${barber.name}.`, "success");
             }
 
             this.navigate('barberDashboard', { id: barber.id });
@@ -662,38 +668,19 @@ class App {
     manageBarberTrial(id) {
         const barber = window.db.barbers.find(b => b.id === id);
         if (barber) {
-            const days = prompt(`إدارة فترة التجربة للحلاق: ${barber.name}\n\nأدخل عدد الأيام التي تريد منحها كفترة تجريبية مجانية:`, "30");
-            if (days && !isNaN(days)) {
+            const newDays = prompt(`أدخل عدد الأيام التي تريد إضافتها كفترة تجريبية لصالون ${barber.name}:\n(أدخل رقماً، مثلاً: 30)`, "30");
+            if (newDays && !isNaN(parseInt(newDays))) {
+                const days = parseInt(newDays);
+                const endDate = new Date(barber.subscriptionEndDate || Date.now());
+                endDate.setDate(endDate.getDate() + days);
+                barber.subscriptionEndDate = endDate.toISOString();
                 barber.subscriptionStatus = 'trial';
-                barber.trialDays = parseInt(days);
                 window.saveDB();
-                window.notifier.show("تم التحديث", `تم منح ${barber.name} فترة تجربة لمدة ${days} يوماً بنجاح.`, "success");
-                this.navigate('adminDashboard');
+                window.notifier.show("تم التحديث", `تم تمديد الفترة التجريبية للحلاق ${barber.name} لمدة ${days} يوماً بنجاح.`, "success");
+                this.navigate('adminDashboard'); // Refresh view
             }
         }
     }
-
-    togglePublishProfile(btnElement) {
-        const barberId = parseInt(localStorage.getItem('barbergo_session').split('_')[1]);
-        const barber = window.db.barbers.find(b => b.id === barberId);
-        
-        if (!barber) return;
-
-        barber.isPublished = !barber.isPublished;
-        const state = barber.isPublished;
-        
-        btnElement.className = `btn ${state ? 'btn-success' : 'btn-outline-gold'} btn-block`;
-        btnElement.innerHTML = state ? '<i class="fa-solid fa-check-circle"></i> منشور وجاهز للاستقبال' : '<i class="fa-solid fa-upload"></i> نشر للعملاء الآن';
-        
-        window.saveDB();
-        
-        if (state) {
-            window.notifier.show("تم النشر", "تهانينا! بروفايلك الآن متاح للعملاء على المنصة ويمكنهم الحجز لديك.", "success");
-        } else {
-            window.notifier.show("تم إخفاء البروفايل", "تم سحب البروفايل من الصفحة الرئيسية، لن يتمكن العملاء الجدد من رؤيته.", "info");
-        }
-    }
-
 
     saveBarberSettings() {
         const barberId = parseInt(localStorage.getItem('barbergo_session').split('_')[1]);
@@ -704,6 +691,11 @@ class App {
             barber.bio = document.getElementById('barber-edit-bio').value;
             barber.phone = document.getElementById('barber-edit-phone').value;
             barber.location = document.getElementById('barber-edit-location').value;
+            
+            if (!barber.social) barber.social = {};
+            barber.social.whatsapp = document.getElementById('barber-edit-whatsapp').value;
+            barber.social.instagram = document.getElementById('barber-edit-instagram').value;
+            barber.social.facebook = document.getElementById('barber-edit-facebook').value;
 
             window.saveDB();
             window.notifier.show("تم الحفظ", "تم حفظ وتحديث إعدادات ملفك الشخصي بنجاح.", "success");
@@ -729,6 +721,68 @@ class App {
             btnElement.className = `btn ${state ? 'btn-primary' : 'btn-ghost text-muted'}`;
             btnElement.innerHTML = state ? '<i class="fa-solid fa-toggle-on"></i> متاح' : '<i class="fa-solid fa-toggle-off"></i> غير متاح';
             window.notifier.show("تم التحديث", `تم ${state ? 'تفعيل' : 'تعطيل'} خدمة الحلاقة المنزلية.`, "info");
+        } else if (paramKey === 'visaPayment') {
+            if (!barber.paymentMethods) barber.paymentMethods = {};
+            barber.paymentMethods.visa = !barber.paymentMethods.visa;
+            const state = barber.paymentMethods.visa;
+            btnElement.className = `btn ${state ? 'btn-primary' : 'btn-ghost text-muted'}`;
+            btnElement.innerHTML = state ? 'مفعل' : 'معطل';
+            window.notifier.show("تم التحديث", `تم ${state ? 'تفعيل' : 'إلغاء'} الدفع بالبطاقة.`, "info");
+        }
+        window.saveDB();
+        window.saveDB();
+    }
+
+    saveBarberPayment() {
+        const barberId = parseInt(localStorage.getItem('barbergo_session').split('_')[1]);
+        const barber = window.db.barbers.find(b => b.id === barberId);
+        if (!barber) return;
+
+        if (!barber.paymentMethods) barber.paymentMethods = {};
+        barber.paymentMethods.cliq = document.getElementById('barber-payment-cliq').value;
+        barber.paymentMethods.wallet = document.getElementById('barber-payment-wallet').value;
+        
+        window.saveDB();
+        window.notifier.show('تم الحفظ', 'تم تحديث وسائل الدفع بنجاح!', 'success');
+    }
+
+    togglePublishProfile(btnElement) {
+        const barberId = parseInt(localStorage.getItem('barbergo_session').split('_')[1]);
+        const barber = window.db.barbers.find(b => b.id === barberId);
+        if (!barber) return;
+
+        barber.isPublished = !barber.isPublished;
+        window.saveDB();
+
+        if (barber.isPublished) {
+            btnElement.className = 'btn w-100 btn-success';
+            btnElement.innerHTML = '<i class="fa-solid fa-globe"></i> البروفايل منشور وعام للعملاء';
+            btnElement.style.borderColor = '';
+            window.notifier.show('تم النشر!', 'تم نشر بروفايلك بنجاح. الآن أنت مرئي لجميع العملاء.', 'success');
+        } else {
+            btnElement.className = 'btn w-100 btn-outline text-gold';
+            btnElement.innerHTML = '<i class="fa-solid fa-rocket"></i> نشر البروفايل للعملاء';
+            btnElement.style.borderColor = 'var(--gold-primary)';
+            window.notifier.show('تم الإلغاء', 'تم إخفاء بروفايلك عن العملاء مؤقتاً.', 'warning');
+        }
+    }
+
+    toggleBarberHoliday(btnElement, dayIndex) {
+        const barberId = parseInt(localStorage.getItem('barbergo_session').split('_')[1]);
+        const barber = window.db.barbers.find(b => b.id === barberId);
+        if (!barber) return;
+
+        if (!barber.holidays) barber.holidays = [];
+
+        const idx = barber.holidays.indexOf(dayIndex);
+        if (idx > -1) {
+            barber.holidays.splice(idx, 1);
+            btnElement.className = 'btn btn-outline text-muted';
+            btnElement.style.borderColor = 'var(--border-color)';
+        } else {
+            barber.holidays.push(dayIndex);
+            btnElement.className = 'btn btn-danger text-white';
+            btnElement.style.borderColor = '';
         }
         window.saveDB();
     }
