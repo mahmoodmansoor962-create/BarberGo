@@ -742,10 +742,19 @@ const UI = {
 
                 <!-- Page 5: Store -->
                 <div id="bdash-content-5" class="bdash-content" style="display: none;">
-                     <input type="file" id="product-image-upload" accept="image/*" style="display: none;" onchange="app.handleProductImageUpload(event)">
-                     <div class="pill-box p-3 mb-4 text-center cursor-pointer" style="border: 2px dashed var(--gold-primary); background: rgba(212, 175, 55, 0.05);" onclick="app.addProduct()">
-                         <h4 class="text-gold m-0"><i class="fa-solid fa-box-open"></i> إضافة منتج جديد للمتجر</h4>
-                         <div class="text-muted mt-1" style="font-size: 0.85rem;">أضف صورة واسم المنتج مع السعر لبيعه لعملائك</div>
+                     <div class="pill-box p-3 mb-4 text-right" style="background: var(--bg-main); border: 1px solid var(--border-color);">
+                         <h4 class="text-gold mb-3"><i class="fa-solid fa-box-open"></i> إضافة منتج جديد للمتجر</h4>
+                         <div class="form-group mb-3">
+                             <input type="text" id="new-product-name" class="form-control" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: #fff; padding: 10px;" placeholder="اسم المنتج">
+                         </div>
+                         <div class="form-group mb-3">
+                             <input type="number" id="new-product-price" class="form-control" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: #fff; padding: 10px;" placeholder="سعر المنتج (بالدينار)">
+                         </div>
+                         <div class="form-group mb-3">
+                             <input type="file" id="new-product-image" class="form-control" accept="image/*" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: #fff; padding: 7px;">
+                             <div class="text-muted mt-1" style="font-size: 0.8rem;">اختر صورة المنتج لرفعها وعرضها للعملاء</div>
+                         </div>
+                         <button class="btn btn-primary w-100" onclick="app.submitNewProduct()">إضافة المنتج وعرضه للعملاء</button>
                      </div>
                      
                      <div class="products-grid" id="store-products-list" style="grid-template-columns: 1fr 1fr; gap: 15px;">
