@@ -48,13 +48,14 @@ const UI = {
     // 1. Client Features
     // ==========================================
     renderClientHome() {
-        // Sort barbers so that favorites are on top, and hide unpublished ones
-        const publishedBarbers = db.barbers.filter(b => b.isPublished);
-        const sortedBarbers = [...publishedBarbers].sort((a, b) => {
-            if (a.isFavorite && !b.isFavorite) return -1;
-            if (!a.isFavorite && b.isFavorite) return 1;
-            return 0;
-        });
+        // Sort barbers so that favorites are on top
+        const sortedBarbers = [...db.barbers]
+            .filter(b => b.isPublished !== false) // Default to true if undefined, but hide if explicitly false
+            .sort((a, b) => {
+                if (a.isFavorite && !b.isFavorite) return -1;
+                if (!a.isFavorite && b.isFavorite) return 1;
+                return 0;
+            });
 
         const barbersHtml = sortedBarbers.map(b => `
             <div class="barber-grid-card" style="background: var(--bg-card); border-radius: var(--radius-lg); padding: 15px; border: 1px solid var(--border-color); text-align: center;">
@@ -153,9 +154,9 @@ const UI = {
 
                     <div class="social-icons-row mb-3">
                         <div class="social-icon call" onclick="window.location.href='tel:${barber.phone}'"><i class="fa-solid fa-phone"></i><span>Call</span></div>
-                        <div class="social-icon whatsapp" onclick="window.open('https://wa.me/${barber.phone}')"><i class="fa-brands fa-whatsapp"></i><span>Whatsapp</span></div>
-                        <div class="social-icon facebook"><i class="fa-brands fa-facebook-f"></i><span>FB</span></div>
-                        <div class="social-icon instagram"><i class="fa-brands fa-instagram"></i><span>Insta</span></div>
+                        <div class="social-icon whatsapp" onclick="window.open('https://wa.me/${barber.social && barber.social.whatsapp ? barber.social.whatsapp : barber.phone}')"><i class="fa-brands fa-whatsapp"></i><span>Whatsapp</span></div>
+                        ${barber.social && barber.social.facebook ? `<div class="social-icon facebook" onclick="window.open('${barber.social.facebook}')"><i class="fa-brands fa-facebook-f"></i><span>FB</span></div>` : `<div class="social-icon facebook" style="opacity: 0.5;"><i class="fa-brands fa-facebook-f"></i><span>FB</span></div>`}
+                        ${barber.social && barber.social.instagram ? `<div class="social-icon instagram" onclick="window.open('${barber.social.instagram}')"><i class="fa-brands fa-instagram"></i><span>Insta</span></div>` : `<div class="social-icon instagram" style="opacity: 0.5;"><i class="fa-brands fa-instagram"></i><span>Insta</span></div>`}
                     </div>
 
                     ${barber.settings.enableEmergency ? `
@@ -442,7 +443,7 @@ const UI = {
                     <button class="btn btn-ghost bdash-tab-item" id="bdash-tab-5" onclick="app.switchBarberDashboardTab(5)">المتجر</button>
                     <button class="btn btn-ghost bdash-tab-item" id="bdash-tab-7" onclick="app.switchBarberDashboardTab(7)">معرض الصور</button>
                     <button class="btn btn-ghost bdash-tab-item" id="bdash-tab-8" onclick="app.switchBarberDashboardTab(8)">التقييمات</button>
-                    <button class="btn btn-ghost bdash-tab-item" id="bdash-tab-6" onclick="app.switchBarberDashboardTab(6)">المتقدمة</button>
+                    <button class="btn btn-ghost bdash-tab-item" id="bdash-tab-8" onclick="app.switchBarberDashboardTab(8)">التقييمات</button>
                 </div>
 
                 <!-- Page 1: Analytics -->
@@ -523,17 +524,18 @@ const UI = {
                         
                         <div class="form-group mb-4 text-center">
                             <label class="text-gold mb-2 d-block text-right" style="font-weight: bold;"><i class="fa-solid fa-image"></i> صورة الغلاف للصالون (Cover Image)</label>
-                            <input type="file" id="barber-cover-upload" accept="image/*" style="display: none;" onchange="app.handleImageUpload(event, 'cover')">
-                            <div style="border: 2px dashed var(--gold-primary); background: rgba(212, 175, 55, 0.05); padding: 25px; border-radius: var(--radius-sm); cursor: pointer; transition: all 0.3s;" onclick="document.getElementById('barber-cover-upload').click()">
+                            <input type="file" id="cover-image-upload" accept="image/*" style="display: none;" onchange="app.handleImageUpload(event, 'cover')">
+                            <div style="border: 2px dashed var(--gold-primary); background: rgba(212, 175, 55, 0.05); padding: 25px; border-radius: var(--radius-sm); cursor: pointer; transition: all 0.3s;" onclick="document.getElementById('cover-image-upload').click()">
                                 <i class="fa-solid fa-cloud-arrow-up mb-2" style="font-size: 2.5rem; color: var(--gold-primary);"></i>
-                                <div class="text-white" style="font-weight: bold;">اضغط هنا لرفع صورة غلاف من الجهاز</div>
-                                <div class="text-muted mt-1" id="cover-upload-status" style="font-size: 0.8rem;">سواء كنت تستخدم الهاتف أو الكمبيوتر</div>
+                                <div class="text-white" style="font-weight: bold;">اضغط هنا لرفع صورة الغلاف</div>
+                                <div class="text-muted mt-1" style="font-size: 0.8rem;">الصورة التي تظهر للعملاء في أعلى صفحتك</div>
+                                <div id="cover-upload-status" class="mt-2"></div>
                             </div>
                         </div>
 
                         <div class="form-group mb-4">
                             <label class="text-gold mb-2 d-block" style="font-weight: bold;"><i class="fa-solid fa-store"></i> اسم الصالون (Shop Name)</label>
-                            <input type="text" id="barber-edit-name" class="form-control" style="width: 100%; background: var(--bg-main); border: 1px solid var(--border-color); color: #fff; padding: 15px; border-radius: var(--radius-sm); text-align: right; font-size: 1rem;" value="${barber.name || ''}">
+                            <input type="text" id="barber-edit-name" class="form-control" style="width: 100%; background: var(--bg-main); border: 1px solid var(--border-color); color: #fff; padding: 15px; border-radius: var(--radius-sm); text-align: right; font-size: 1rem;" value="${barber.name}">
                         </div>
 
                         <div class="form-group mb-4">
@@ -542,17 +544,31 @@ const UI = {
                         </div>
 
                         <div class="form-group mb-4">
-                            <label class="text-gold mb-2 d-block" style="font-weight: bold;"><i class="fa-solid fa-mobile-screen"></i> رقم الهاتف الرئيسي</label>
-                            <input type="text" id="barber-edit-phone" class="form-control" style="width: 100%; background: var(--bg-main); border: 1px solid var(--border-color); color: #fff; padding: 15px; border-radius: var(--radius-sm); text-align: right; font-size: 1rem;" value="${barber.phone || ''}">
+                            <label class="text-gold mb-2 d-block" style="font-weight: bold;"><i class="fa-solid fa-mobile-screen"></i> رقم الهاتف</label>
+                            <input type="text" id="barber-edit-phone" class="form-control" style="width: 100%; background: var(--bg-main); border: 1px solid var(--border-color); color: #fff; padding: 15px; border-radius: var(--radius-sm); text-align: right; font-size: 1rem;" value="${barber.phone}">
+                        </div>
+
+                        <div class="form-group mb-4">
+                            <label class="text-gold mb-2 d-block" style="font-weight: bold;"><i class="fa-brands fa-whatsapp" style="color: #25D366;"></i> رقم الواتساب</label>
+                            <input type="text" id="barber-edit-whatsapp" class="form-control" style="width: 100%; background: var(--bg-main); border: 1px solid var(--border-color); color: #fff; padding: 15px; border-radius: var(--radius-sm); text-align: right; font-size: 1rem;" value="${(barber.social && barber.social.whatsapp) || barber.phone}">
+                        </div>
+
+                        <div class="form-group mb-4">
+                            <label class="text-gold mb-2 d-block" style="font-weight: bold;"><i class="fa-brands fa-instagram" style="color: #e1306c;"></i> رابط صفحة الانستغرام</label>
+                            <input type="text" id="barber-edit-instagram" class="form-control" style="width: 100%; background: var(--bg-main); border: 1px solid var(--border-color); color: #fff; padding: 15px; border-radius: var(--radius-sm); text-align: right; font-size: 1rem;" value="${(barber.social && barber.social.instagram) || ''}" placeholder="https://instagram.com/...">
+                        </div>
+
+                        <div class="form-group mb-4">
+                            <label class="text-gold mb-2 d-block" style="font-weight: bold;"><i class="fa-brands fa-facebook" style="color: #1877F2;"></i> رابط صفحة الفيسبوك</label>
+                            <input type="text" id="barber-edit-facebook" class="form-control" style="width: 100%; background: var(--bg-main); border: 1px solid var(--border-color); color: #fff; padding: 15px; border-radius: var(--radius-sm); text-align: right; font-size: 1rem;" value="${(barber.social && barber.social.facebook) || ''}" placeholder="https://facebook.com/...">
                         </div>
 
                         <div class="form-group mb-4">
                             <label class="text-gold mb-2 d-block" style="font-weight: bold;"><i class="fa-solid fa-location-dot" style="color: #3498db;"></i> الموقع الجغرافي (العنوان الكامل)</label>
-                            <input type="text" id="barber-edit-location" class="form-control" style="width: 100%; background: var(--bg-main); border: 1px solid var(--border-color); color: #fff; padding: 15px; border-radius: var(--radius-sm); text-align: right; font-size: 1rem;" value="${barber.location || ''}">
+                            <input type="text" id="barber-edit-location" class="form-control" style="width: 100%; background: var(--bg-main); border: 1px solid var(--border-color); color: #fff; padding: 15px; border-radius: var(--radius-sm); text-align: right; font-size: 1rem;" value="${barber.location}">
                         </div>
 
-                        <div class="pill-box mb-4" style="background: rgba(231,76,60,0.05); border: 1px solid rgba(231,76,60,0.3);">
-                            <h4 class="text-gold mb-3"><i class="fa-solid fa-bolt"></i> خيارات الخدمات الخاصة</h4>
+                        <div class="pill-box p-3 mb-4 mt-4 text-right" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color);">
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <div>
                                     <div class="text-white" style="font-weight: bold;">تفعيل زر اتصال الطوارئ</div>
@@ -573,14 +589,40 @@ const UI = {
                             </div>
                         </div>
 
-                        <button class="btn btn-primary btn-block mt-3" style="padding: 15px; font-size: 1.1rem;" onclick="app.saveBarberSettings()">حفظ التعديلات الفعلية</button>
-                        
-                        <div class="mt-4 pt-3 text-center" style="border-top: 1px dashed var(--border-color);">
-                            <h4 class="text-white mb-2"><i class="fa-solid fa-globe"></i> نشر البروفايل للعملاء</h4>
-                            <p class="text-muted" style="font-size: 0.85rem;">لن يظهر حسابك للعملاء إلا إذا قمت بالنشر. تأكد من صحة بياناتك قبل النشر!</p>
-                            <button id="btn-publish-profile" class="btn ${barber.isPublished ? 'btn-success' : 'btn-outline-gold'} btn-block" style="padding: 15px; font-size: 1.1rem;" onclick="app.togglePublishProfile(this)">
-                                ${barber.isPublished ? '<i class="fa-solid fa-check-circle"></i> منشور وجاهز للاستقبال' : '<i class="fa-solid fa-upload"></i> نشر للعملاء الآن'}
+                        <button class="btn btn-primary w-100 mt-3" style="padding: 15px; font-size: 1.1rem;" onclick="app.saveBarberSettings()">حفظ التعديلات الفعلية</button>
+
+                        <div class="mt-4 pt-4 text-center" style="border-top: 1px dashed var(--gold-primary);">
+                            <h4 class="text-white mb-2">هل أكملت إعداد صفحتك؟</h4>
+                            <p class="text-muted mb-3" style="font-size: 0.85rem;">انشر بروفايلك ليتمكن العملاء من رؤيته والحجز لديك فوراً</p>
+                            <button class="btn w-100 ${barber.isPublished ? 'btn-success' : 'btn-outline text-gold'}" style="${!barber.isPublished ? 'border-color: var(--gold-primary);' : ''} padding: 15px; font-size: 1.2rem; font-weight: bold;" onclick="app.togglePublishProfile(this)">
+                                ${barber.isPublished ? '<i class="fa-solid fa-globe"></i> البروفايل منشور وعام للعملاء' : '<i class="fa-solid fa-rocket"></i> نشر البروفايل للعملاء'}
                             </button>
+                        </div>
+
+                        <div class="pill-box text-right mt-4 border-gold">
+                            <h4 class="text-gold mb-3"><i class="fa-solid fa-wallet"></i> إعدادات الدفع للعملاء (Payment)</h4>
+                            <p class="text-muted mb-4" style="font-size: 0.85rem; line-height: 1.5;">قم بإضافة تفاصيل وسائل الدفع الخاصة بك ليتمكن العملاء من الدفع مسبقاً إذا رغبوا. الحجز يبقى مستقلاً وتأكيده لا يتطلب الدفع.</p>
+                            
+                            <div class="form-group mb-4">
+                                <label class="text-white mb-2 d-flex justify-content-between"><span>معرف كليك (CliQ Alias)</span> <span class="text-success" style="font-size: 0.8rem;">${(barber.paymentMethods && barber.paymentMethods.cliq) ? 'مفعل' : 'معطل'}</span></label>
+                                <input type="text" id="barber-payment-cliq" class="form-control text-left" dir="ltr" placeholder="مثال: AHMAD199" style="background: var(--bg-main); border-color: var(--border-color); color: #fff;" value="${(barber.paymentMethods && barber.paymentMethods.cliq) || ''}">
+                            </div>
+
+                            <div class="form-group mb-4">
+                                <label class="text-white mb-2 d-flex justify-content-between"><span>رقم المحفظة (Wallet)</span> <span class="text-success" style="font-size: 0.8rem;">${(barber.paymentMethods && barber.paymentMethods.wallet) ? 'مفعل' : 'معطل'}</span></label>
+                                <input type="text" id="barber-payment-wallet" class="form-control text-left" dir="ltr" placeholder="07XXXXXXXX" style="background: var(--bg-main); border-color: var(--border-color); color: #fff;" value="${(barber.paymentMethods && barber.paymentMethods.wallet) || ''}">
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center mb-4">
+                                <div>
+                                    <h4 class="m-0 text-white"><i class="fa-brands fa-cc-visa text-gold"></i> الدفع بالبطاقة بالصالون</h4>
+                                </div>
+                                <button id="btn-toggle-visa" class="btn ${barber.paymentMethods && barber.paymentMethods.visa ? 'btn-primary' : 'btn-ghost text-muted'}" style="border: 1px solid var(--border-color);" onclick="app.toggleBarberSettingParam(this, 'visaPayment')">
+                                    ${barber.paymentMethods && barber.paymentMethods.visa ? 'مفعل' : 'معطل'}
+                                </button>
+                            </div>
+
+                            <button class="btn btn-primary w-100" onclick="app.saveBarberPayment()">حفظ وسائل الدفع</button>
                         </div>
                     </div>
                 </div>
@@ -629,7 +671,20 @@ const UI = {
                                 <option selected>60 دقيقة</option>
                             </select>
                         </div>
-                        <button class="btn btn-primary w-100 mt-3" style="padding: 12px; font-size: 1rem;" onclick="app.toggleSetting('حفظ أوقات العمل')">حفظ الأوقات المدخلة</button>
+                        
+                        <div class="form-group mt-3">
+                            <label class="text-gold mb-2 d-block" style="font-size: 0.85rem;"><i class="fa-solid fa-calendar-xmark"></i> أيام العطلة الأسبوعية (Holidays)</label>
+                            <p class="text-muted mb-2" style="font-size: 0.75rem;">اختر الأيام التي تغلق بها صالونك ولن يتمكن العملاء من الحجز فيها.</p>
+                            
+                            <div class="d-flex flex-wrap" style="gap: 10px;" id="barber-holidays-container">
+                                ${['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'].map((day, index) => {
+                                    const isHoliday = barber.holidays && barber.holidays.includes(index);
+                                    return `<button class="btn ${isHoliday ? 'btn-danger text-white' : 'btn-outline text-muted'}" style="${!isHoliday ? 'border-color: var(--border-color);' : ''} border-radius: 20px; padding: 5px 15px; font-size: 0.8rem;" onclick="app.toggleBarberHoliday(this, ${index})">${day}</button>`;
+                                }).join('')}
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary w-100 mt-4" style="padding: 12px; font-size: 1rem;" onclick="window.notifier.show('تم الحفظ', 'تم حفظ أوقات العمل والعطل بنجاح', 'success')">حفظ الأوقات المدخلة</button>
                     </div>
 
                     <!-- Existing Bookings -->
@@ -677,38 +732,46 @@ const UI = {
 
                 <!-- Page 5: Store -->
                 <div id="bdash-content-5" class="bdash-content" style="display: none;">
-                     <input type="file" id="product-image-upload" accept="image/*" style="display: none;" onchange="app.handleProductImageUpload(event)">
-                     <div class="pill-box p-3 mb-4 text-center cursor-pointer" style="border: 2px dashed var(--gold-primary); background: rgba(212, 175, 55, 0.05);" onclick="app.addProduct()">
+                     <div class="pill-box p-3 mb-4 text-center cursor-pointer" style="border: 2px dashed var(--gold-primary); background: rgba(212, 175, 55, 0.05);" onclick="app.simulateAddProduct()">
                          <h4 class="text-gold m-0"><i class="fa-solid fa-box-open"></i> إضافة منتج جديد للمتجر</h4>
                          <div class="text-muted mt-1" style="font-size: 0.85rem;">أضف صورة واسم المنتج مع السعر لبيعه لعملائك</div>
                      </div>
                      
                      <div class="products-grid" id="store-products-list" style="grid-template-columns: 1fr 1fr; gap: 15px;">
-                         ${db.products && db.products.filter(p => p.barber_id === barberId).length > 0 ? db.products.filter(p => p.barber_id === barberId).map(p => `
                          <div class="pill-box p-2 text-center" style="position: relative;">
                              <button class="btn btn-ghost text-danger p-1" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.5); border-radius: 50%;" onclick="this.parentElement.remove()"><i class="fa-solid fa-trash"></i></button>
-                             <img src="${p.image}" style="width: 100%; height: 120px; object-fit: cover; border-radius: 8px; margin-bottom: 10px;">
-                             <h4 class="text-white m-0" style="font-size: 0.95rem;">${p.name}</h4>
-                             <div class="text-gold mt-1" style="font-size: 0.9rem; font-weight: bold;">${p.price} JOD</div>
+                             <img src="https://images.unsplash.com/photo-1599305090598-fe179d501227?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60" style="width: 100%; height: 120px; object-fit: cover; border-radius: 8px; margin-bottom: 10px;">
+                             <h4 class="text-white m-0" style="font-size: 0.95rem;">شامبو اللحية الفاخر</h4>
+                             <div class="text-gold mt-1" style="font-size: 0.9rem; font-weight: bold;">12 JOD</div>
                          </div>
-                         `).join('') : '<div class="text-muted text-center w-100" style="grid-column: span 2;">لا توجد منتجات مضافة بعد</div>'}
+                         <div class="pill-box p-2 text-center" style="position: relative;">
+                             <button class="btn btn-ghost text-danger p-1" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.5); border-radius: 50%;" onclick="this.parentElement.remove()"><i class="fa-solid fa-trash"></i></button>
+                             <img src="https://images.unsplash.com/photo-1621607512214-68297480165e?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60" style="width: 100%; height: 120px; object-fit: cover; border-radius: 8px; margin-bottom: 10px;">
+                             <h4 class="text-white m-0" style="font-size: 0.95rem;">جل العناية بالشعر</h4>
+                             <div class="text-gold mt-1" style="font-size: 0.9rem; font-weight: bold;">8 JOD</div>
+                         </div>
                      </div>
                 </div>
 
                 <!-- Page 7: Gallery -->
                 <div id="bdash-content-7" class="bdash-content" style="display: none;">
-                    <input type="file" id="gallery-image-upload" accept="image/*" style="display: none;" onchange="app.handleImageUpload(event, 'gallery')">
-                    <div class="pill-box p-3 mb-4 text-center cursor-pointer" style="border: 2px dashed var(--gold-primary); background: rgba(212, 175, 55, 0.05);" onclick="document.getElementById('gallery-image-upload').click()">
+                    <div class="pill-box p-3 mb-4 text-center cursor-pointer" style="border: 2px dashed var(--gold-primary); background: rgba(212, 175, 55, 0.05);" onclick="app.simulateAddGalleryImage()">
                          <h4 class="text-gold m-0"><i class="fa-solid fa-images"></i> رفع صورة جديدة لمعرض الأعمال</h4>
                          <div class="text-muted mt-1" style="font-size: 0.85rem;">الصور تجذب العملاء الجدد بنسبة 70% أكثر</div>
                      </div>
                      <div class="products-grid" id="gallery-images-list" style="grid-template-columns: repeat(3, 1fr); gap: 10px;">
-                         ${barber.gallery && barber.gallery.length > 0 ? barber.gallery.map(img => `
                          <div style="position: relative;">
                              <button class="btn btn-ghost text-danger p-1" style="position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.6); border-radius: 50%; z-index: 2;" onclick="this.parentElement.remove()"><i class="fa-solid fa-xmark"></i></button>
-                             <img src="${img}" style="width: 100%; height: 100px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border-color);">
+                             <img src="https://images.unsplash.com/photo-1593980634289-cb4eb5f7a0b3?w=400&q=80" style="width: 100%; height: 100px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border-color);">
                          </div>
-                         `).join('') : '<div class="text-muted text-center w-100" style="grid-column: span 3;">لا توجد صور في المعرض حالياً</div>'}
+                         <div style="position: relative;">
+                             <button class="btn btn-ghost text-danger p-1" style="position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.6); border-radius: 50%; z-index: 2;" onclick="this.parentElement.remove()"><i class="fa-solid fa-xmark"></i></button>
+                             <img src="https://images.unsplash.com/photo-1622286342621-4bd786c2447c?w=400&q=80" style="width: 100%; height: 100px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border-color);">
+                         </div>
+                         <div style="position: relative;">
+                             <button class="btn btn-ghost text-danger p-1" style="position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.6); border-radius: 50%; z-index: 2;" onclick="this.parentElement.remove()"><i class="fa-solid fa-xmark"></i></button>
+                             <img src="https://images.unsplash.com/photo-1512496015851-a1fbbfc61a4b?w=400&q=80" style="width: 100%; height: 100px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border-color);">
+                         </div>
                      </div>
                 </div>
 
@@ -737,51 +800,7 @@ const UI = {
                         </div>
                     </div>
                 </div>
-
-                <!-- Page 6: Advanced -->
-                <div id="bdash-content-6" class="bdash-content" style="display: none;">
-                    <div class="pill-box text-right">
-                        <h4 class="text-gold mb-4">الخيارات المتقدمة</h4>
-                        <div class="d-flex justify-content-between align-items-center mb-4">
-                            <div>
-                                <h4 class="m-0 text-white">خدمة المنازل (House Calls)</h4>
-                                <p class="text-muted m-0" style="font-size: 0.8rem;">السماح للعملاء بطلب قدومك لمنازلهم</p>
-                            </div>
-                            <button class="btn ${barber.settings.enableHomeService ? 'btn-primary' : 'btn-ghost'}" onclick="app.toggleSetting('خدمة المنازل')">${barber.settings.enableHomeService ? 'مفعل' : 'معطل'}</button>
-                        </div>
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h4 class="m-0 text-danger">حجوزات الطوارئ 🚨</h4>
-                                <p class="text-muted m-0" style="font-size: 0.8rem;">السماح بتخطي وقت الانتظار بأسعار مضاعفة</p>
-                            </div>
-                            <button class="btn ${barber.settings.enableEmergency ? 'btn-primary text-white' : 'btn-ghost'}" style="${barber.settings.enableEmergency ? 'background: #e74c3c;' : ''}" onclick="app.toggleSetting('حجوزات الطوارئ')">${barber.settings.enableEmergency ? 'مفعل' : 'معطل'}</button>
-                        </div>
-                    </div>
-
-                    <div class="pill-box text-right mt-4 border-gold">
-                        <h4 class="text-gold mb-3"><i class="fa-solid fa-wallet"></i> إعدادات الدفع للعملاء (Payment)</h4>
-                        <p class="text-muted mb-4" style="font-size: 0.85rem; line-height: 1.5;">قم بإضافة تفاصيل وسائل الدفع الخاصة بك ليتمكن العملاء من الدفع مسبقاً إذا رغبوا. الحجز يبقى مستقلاً وتأكيده لا يتطلب الدفع.</p>
-                        
-                        <div class="form-group mb-4">
-                            <label class="text-white mb-2 d-flex justify-content-between"><span>معرف كليك (CliQ Alias)</span> <span class="text-success" style="font-size: 0.8rem;">${(barber.paymentMethods && barber.paymentMethods.cliq) ? 'مفعل' : 'معطل'}</span></label>
-                            <input type="text" class="form-control text-left" dir="ltr" placeholder="مثال: AHMAD199" style="background: var(--bg-main); border-color: var(--border-color); color: #fff;" value="${(barber.paymentMethods && barber.paymentMethods.cliq) || ''}">
-                        </div>
-
-                        <div class="form-group mb-4">
-                            <label class="text-white mb-2 d-flex justify-content-between"><span>رقم المحفظة (Wallet)</span> <span class="text-success" style="font-size: 0.8rem;">${(barber.paymentMethods && barber.paymentMethods.wallet) ? 'مفعل' : 'معطل'}</span></label>
-                            <input type="text" class="form-control text-left" dir="ltr" placeholder="07XXXXXXXX" style="background: var(--bg-main); border-color: var(--border-color); color: #fff;" value="${(barber.paymentMethods && barber.paymentMethods.wallet) || ''}">
-                        </div>
-
-                        <div class="d-flex justify-content-between align-items-center mb-4">
-                            <div>
-                                <h4 class="m-0 text-white"><i class="fa-brands fa-cc-visa text-gold"></i> الدفع بالبطاقة بالصالون</h4>
-                            </div>
-                            <button class="btn btn-outline" style="border-color: var(--gold-primary);" onclick="app.toggleSetting('الدفع بالبطاقة')">${(barber.paymentMethods && barber.paymentMethods.visa) ? 'مفعل' : 'معطل'}</button>
-                        </div>
-
-                        <button class="btn btn-primary w-100" onclick="window.notifier.show('تم الحفظ', 'تم تحديث خيارات الدفع بنجاح!', 'success')">حفظ وسائل الدفع</button>
-                    </div>
-                </div>
+                <!-- Payment was moved to Profile page -->
 
             </div>
             
@@ -851,25 +870,27 @@ const UI = {
                 ${isBlocked ? '<i class="fa-solid fa-lock"></i> محظور' : '<i class="fa-solid fa-lock-open"></i> تفعيل'}
             </button>`;
 
-            const alertBtn = `<button class="btn text-warning p-1" style="font-size: 1rem;" onclick="app.sendSubscriptionAlert('${b.name}')" title="إرسال تنبيه"><i class="fa-solid fa-bell"></i></button>`;
-            
-            const deleteBtn = `<button class="btn text-danger p-1" style="font-size: 1rem;" onclick="app.deleteBarber(${b.id})" title="حذف نهائي"><i class="fa-solid fa-trash"></i></button>`;
-            
-            const trialBtn = `<button class="btn text-info p-1" style="font-size: 1rem;" onclick="app.manageBarberTrial(${b.id})" title="إدارة التجربة"><i class="fa-solid fa-calendar-plus"></i></button>`;
+            const trialBtn = `<button class="btn btn-outline text-gold p-1 ml-2" style="border-color: var(--gold-primary); font-size: 0.75rem; width: 80px;" onclick="app.manageBarberTrial(${b.id})"><i class="fa-solid fa-clock"></i> التجربة</button>`;
+            const deleteBtn = `<button class="btn btn-ghost text-danger p-1 ml-2" style="font-size: 1rem;" onclick="app.deleteBarber(${b.id})"><i class="fa-solid fa-trash"></i></button>`;
+            const alertBtn = `<button class="btn text-warning p-1" style="font-size: 1rem;" onclick="app.sendSubscriptionAlert('${b.name}')"><i class="fa-solid fa-bell"></i></button>`;
 
             return `
-                <div class="pill-box p-3 mb-3 d-flex justify-content-between align-items-center" style="border-right: 3px solid ${isBlocked ? '#e74c3c' : 'var(--gold-primary)'};">
-                    <div class="d-flex align-items-center gap-3">
-                        <img src="${b.image}" width="45" height="45" style="border-radius: 50%; border: 1px solid var(--border-color); object-fit: cover;">
-                        <div class="text-right">
-                            <div style="font-weight: bold; color: #fff; font-size: 0.95rem;">${b.name}</div>
-                            <div class="mt-1">${subBadge} <span class="text-muted" style="font-size: 0.75rem;"><i class="fa-solid fa-phone"></i> ${b.phone}</span></div>
+                <div class="pill-box p-3 mb-3 d-flex flex-column" style="border-right: 3px solid ${isBlocked ? '#e74c3c' : 'var(--gold-primary)'};">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="d-flex align-items-center gap-3">
+                            <img src="${b.image}" width="45" height="45" style="border-radius: 50%; border: 1px solid var(--border-color); object-fit: cover;">
+                            <div class="text-right">
+                                <div style="font-weight: bold; color: #fff; font-size: 0.95rem;">${b.name}</div>
+                                <div class="mt-1">${subBadge} <span class="text-muted" style="font-size: 0.75rem;"><i class="fa-solid fa-phone"></i> ${b.phone}</span></div>
+                            </div>
+                        </div>
+                        <div>
+                            ${alertBtn}
+                            ${deleteBtn}
                         </div>
                     </div>
-                    <div class="d-flex flex-wrap align-items-center justify-content-end gap-2" style="max-width: 150px;">
+                    <div class="d-flex justify-content-end mt-2" style="gap: 5px; border-top: 1px solid var(--border-color); padding-top: 10px;">
                         ${trialBtn}
-                        ${alertBtn}
-                        ${deleteBtn}
                         ${actionBtn}
                     </div>
                 </div>
