@@ -525,43 +525,68 @@ class App {
     // Voice Search
     startVoiceSearch(btn) {
         if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-            window.notifier.show("غير مدعوم", "متصفحك الحالي لا يدعم التعرف على الصوت.", "warning");
+            window.notifier.show("غير مدعوم", "متصفحك الحالي لا يدعم التعرف على الصوت. يرجى إدخال اسم الصالون يدوياً.", "warning");
+            const manualSearch = prompt(this.language === 'en' ? 'Enter salon name:' : 'يرجى إدخال اسم الصالون للبحث عنه:');
+            if (manualSearch) {
+                if (this.currentView === 'clientHome') {
+                    const searchInput = document.getElementById('client-search-input');
+                    if (searchInput) {
+                        searchInput.value = manualSearch;
+                        this.filterBarbers();
+                    }
+                }
+            }
             return;
         }
 
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const recognition = new SpeechRecognition();
-        recognition.lang = this.language === 'en' ? 'en-US' : 'ar-SA';
-        recognition.interimResults = false;
-        recognition.maxAlternatives = 1;
+        try {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const recognition = new SpeechRecognition();
+            recognition.lang = this.language === 'en' ? 'en-US' : 'ar-SA';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
 
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-        window.notifier.show("تحدث الآن", "نحن نستمع إليك... قل اسم الصالون.", "info");
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            window.notifier.show("تحدث الآن", "نحن نستمع إليك... قل اسم الصالون.", "info");
 
-        recognition.start();
+            recognition.start();
 
-        recognition.onresult = (event) => {
-            const speechResult = event.results[0][0].transcript;
-            btn.innerHTML = '<i class="fa-solid fa-microphone"></i>';
-            window.notifier.show("تم الالتقاط", `البحث عن: "${speechResult}"`, "success");
-            
-            if (this.currentView === 'clientHome') {
-                const searchInput = document.getElementById('client-search-input');
-                if (searchInput) {
-                    searchInput.value = speechResult;
-                    this.filterBarbers();
+            recognition.onresult = (event) => {
+                const speechResult = event.results[0][0].transcript;
+                btn.innerHTML = '<i class="fa-solid fa-microphone"></i>';
+                window.notifier.show("تم الالتقاط", `البحث عن: "${speechResult}"`, "success");
+                
+                if (this.currentView === 'clientHome') {
+                    const searchInput = document.getElementById('client-search-input');
+                    if (searchInput) {
+                        searchInput.value = speechResult;
+                        this.filterBarbers();
+                    }
+                }
+            };
+
+            recognition.onspeechend = () => {
+                recognition.stop();
+            };
+
+            recognition.onerror = (event) => {
+                btn.innerHTML = '<i class="fa-solid fa-microphone"></i>';
+                window.notifier.show("خطأ", "لم نتمكن من التعرف على الصوت بوضوح.", "error");
+            };
+        } catch (error) {
+            window.notifier.show("غير مدعوم", "يبدو أن متصفحك يمنع تسجيل الصوت. يرجى البحث يدوياً.", "warning");
+            const manualSearch = prompt(this.language === 'en' ? 'Enter salon name:' : 'يرجى إدخال اسم الصالون للبحث عنه:');
+            if (manualSearch) {
+                if (this.currentView === 'clientHome') {
+                    const searchInput = document.getElementById('client-search-input');
+                    if (searchInput) {
+                        searchInput.value = manualSearch;
+                        this.filterBarbers();
+                    }
                 }
             }
-        };
-
-        recognition.onspeechend = () => {
-            recognition.stop();
-        };
-
-        recognition.onerror = (event) => {
             btn.innerHTML = '<i class="fa-solid fa-microphone"></i>';
-            window.notifier.show("خطأ", "لم نتمكن من التعرف على الصوت بوضوح.", "error");
-        };
+        }
     }
 
     // AI Camera Real Logic
