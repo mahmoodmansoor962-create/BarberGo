@@ -1,11 +1,50 @@
 // Application Logic and Component Router for BarberGo
 
+// Dictionary for real bilingual system
+window.i18n = {
+    ar: {
+        settings: "الإعدادات",
+        home: "الرئيسية",
+        searchPlaceholder: "ابحث باسم الحلاق أو بالصوت ...",
+        suggestedBarbers: "صالونات مقترحة لك",
+        bookAppointment: "حجز الموعد",
+        location: "الموقع والتواصل",
+        aiMirror: "مرآة الذكاء الاصطناعي",
+        aiDesc: "افتح الكاميرا لاكتشاف القصة المثالية",
+        services: "الحجز والخدمات",
+        store: "المتجر",
+        gallery: "المعرض",
+        reviews: "التقييمات",
+        payment: "طرق الدفع",
+        address: "عنوان الصالون",
+        emergency: "طلب حجز طارئ!"
+    },
+    en: {
+        settings: "Settings",
+        home: "Home",
+        searchPlaceholder: "Search by barber name or voice ...",
+        suggestedBarbers: "Suggested Salons For You",
+        bookAppointment: "Book",
+        location: "Location & Contact",
+        aiMirror: "AI Mirror",
+        aiDesc: "Open camera to discover your perfect cut",
+        services: "Booking & Services",
+        store: "Store",
+        gallery: "Gallery",
+        reviews: "Reviews",
+        payment: "Payments",
+        address: "Salon Address",
+        emergency: "Emergency Booking!"
+    }
+};
+
 class App {
     constructor() {
         this.appElement = document.getElementById('app');
         this.currentView = 'welcome';
         this.currentParams = {};
-        this.language = 'ar'; // Default language
+        this.language = localStorage.getItem('barbergo_lang') || 'ar'; // Real persistence
+        document.documentElement.dir = this.language === 'ar' ? 'rtl' : 'ltr';
         this.init();
     }
 
@@ -109,13 +148,25 @@ class App {
     // Interactions & Routing Helpers
     toggleLanguage() {
         this.language = this.language === 'ar' ? 'en' : 'ar';
-        // In a real app we'd load translations. Here we just swap direction & show toast.
+        localStorage.setItem('barbergo_lang', this.language);
         document.documentElement.dir = this.language === 'ar' ? 'rtl' : 'ltr';
         document.documentElement.lang = this.language;
         const msg = this.language === 'ar' ? 'تم تحويل اللغة إلى العربية' : 'Language switched to English';
-        window.notifier.show("تغيير اللغة", msg, "info");
-        // Re-render current view to apply language changes (visually simulated for now)
+        window.notifier.show("تغيير اللغة", msg, "success");
         this.navigate(this.currentView, this.currentParams);
+    }
+
+    filterBarbers() {
+        const query = document.getElementById('client-search-input').value.toLowerCase();
+        const barberCards = document.querySelectorAll('.barber-grid-card');
+        barberCards.forEach(card => {
+            const name = card.querySelector('h3').innerText.toLowerCase();
+            if (name.includes(query)) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
     }
 
     requestLocation() {
@@ -474,24 +525,44 @@ class App {
 
     // Voice Search
     startVoiceSearch(btn) {
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
-            navigator.mediaDevices.getUserMedia({ audio: true })
-                .then(stream => {
-                    window.notifier.show("تسجيل الصوت", "تحدث الآن، الميكروفون يعمل ويستمع إليك...", "success");
-                    setTimeout(() => {
-                        stream.getTracks().forEach(track => track.stop());
-                        btn.innerHTML = '<i class="fa-solid fa-microphone"></i>';
-                        window.notifier.show("تحليل الصوت", "تم التقاط صوتك بنجاح. جاري البحث في الصالونات...", "info");
-                    }, 4000);
-                })
-                .catch(err => {
-                    btn.innerHTML = '<i class="fa-solid fa-microphone"></i>';
-                    window.notifier.show("إذن مرفوض", "لم يتمكن التطبيق من الوصول للميكروفون الخاص بك.", "error");
-                });
-        } else {
-            window.notifier.show("غير مدعوم", "متصفحك الحالي لا يدعم تسجيل الصوت.", "warning");
+        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+            window.notifier.show("غير مدعوم", "متصفحك الحالي لا يدعم التعرف على الصوت.", "warning");
+            return;
         }
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        recognition.lang = this.language === 'en' ? 'en-US' : 'ar-SA';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+        window.notifier.show("تحدث الآن", "نحن نستمع إليك... قل اسم الصالون.", "info");
+
+        recognition.start();
+
+        recognition.onresult = (event) => {
+            const speechResult = event.results[0][0].transcript;
+            btn.innerHTML = '<i class="fa-solid fa-microphone"></i>';
+            window.notifier.show("تم الالتقاط", `البحث عن: "${speechResult}"`, "success");
+            
+            if (this.currentView === 'clientHome') {
+                const searchInput = document.getElementById('client-search-input');
+                if (searchInput) {
+                    searchInput.value = speechResult;
+                    this.filterBarbers();
+                }
+            }
+        };
+
+        recognition.onspeechend = () => {
+            recognition.stop();
+        };
+
+        recognition.onerror = (event) => {
+            btn.innerHTML = '<i class="fa-solid fa-microphone"></i>';
+            window.notifier.show("خطأ", "لم نتمكن من التعرف على الصوت بوضوح.", "error");
+        };
     }
 
     // AI Camera Real Logic
@@ -696,9 +767,10 @@ class App {
             barber.social.whatsapp = document.getElementById('barber-edit-whatsapp').value;
             barber.social.instagram = document.getElementById('barber-edit-instagram').value;
             barber.social.facebook = document.getElementById('barber-edit-facebook').value;
+            barber.social.website = document.getElementById('barber-edit-website').value;
 
             window.saveDB();
-            window.notifier.show("تم الحفظ", "تم حفظ وتحديث إعدادات ملفك الشخصي بنجاح.", "success");
+            window.notifier.show("تم الحفظ", "تم حفظ وتحديث إعدادات ملفك الشخصي وعرضها للعملاء بنجاح.", "success");
         }
     }
 
