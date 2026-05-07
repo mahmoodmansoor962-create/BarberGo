@@ -207,20 +207,19 @@ class App {
         }
     }
 
-    addProduct() {
-        const name = prompt("أدخل اسم المنتج الجديد:");
-        const price = prompt("أدخل سعر المنتج (بالدينار):");
+    submitNewProduct() {
+        const nameInput = document.getElementById('new-product-name');
+        const priceInput = document.getElementById('new-product-price');
+        const imageInput = document.getElementById('new-product-image');
 
-        if (name && price) {
-            window.tempProductName = name;
-            window.tempProductPrice = price;
-            document.getElementById('product-image-upload').click();
+        const name = nameInput.value.trim();
+        const price = priceInput.value.trim();
+        const file = imageInput.files[0];
+
+        if (!name || !price || !file) {
+            window.notifier.show("بيانات غير مكتملة", "يرجى إدخال اسم المنتج والسعر واختيار صورة.", "warning");
+            return;
         }
-    }
-
-    handleProductImageUpload(event) {
-        const file = event.target.files[0];
-        if (!file) return;
 
         const reader = new FileReader();
         reader.onload = function (e) {
@@ -230,8 +229,8 @@ class App {
             const newProduct = {
                 id: Date.now(),
                 barber_id: barberId,
-                name: window.tempProductName,
-                price: parseFloat(window.tempProductPrice),
+                name: name,
+                price: parseFloat(price),
                 image: base64Image
             };
 
@@ -249,12 +248,12 @@ class App {
                 </div>`;
                 container.innerHTML += html;
             }
-            window.notifier.show("تمت الإضافة", `تم إضافة ${window.tempProductName} إلى المتجر بنجاح.`, "success");
+            window.notifier.show("تمت الإضافة", `تم إضافة ${newProduct.name} إلى المتجر وتم عرضه للعملاء بنجاح.`, "success");
 
             // Clean up
-            event.target.value = '';
-            delete window.tempProductName;
-            delete window.tempProductPrice;
+            nameInput.value = '';
+            priceInput.value = '';
+            imageInput.value = '';
         };
         reader.readAsDataURL(file);
     }
