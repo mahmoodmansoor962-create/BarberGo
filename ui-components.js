@@ -25,19 +25,22 @@ const UI = {
     },
 
     renderBottomNav(activeTab = 'home') {
+        const lang = window.app && window.app.language ? window.app.language : 'ar';
+        const i18n = window.i18n ? window.i18n[lang] : { settings: 'الإعدادات', home: 'الرئيسية' };
+        
         return `
             <div class="bottom-nav-container">
                 <div class="bottom-nav">
                     <div class="nav-item ${activeTab === 'settings' ? 'active' : ''}" onclick="app.navigate('clientSettings')">
                         <i class="fa-solid fa-gear"></i>
-                        <span>الإعدادات</span>
+                        <span>${i18n.settings}</span>
                     </div>
                     <div class="nav-center-action" onclick="app.navigate('aiCamera')">
                         <i class="fa-solid fa-scissors"></i>
                     </div>
                     <div class="nav-item ${activeTab === 'home' ? 'active' : ''}" onclick="app.navigate('clientHome')">
                         <i class="fa-solid fa-house"></i>
-                        <span>الرئيسية</span>
+                        <span>${i18n.home}</span>
                     </div>
                 </div>
             </div>
@@ -78,10 +81,10 @@ const UI = {
                 <div class="container py-4">
                     <div class="search-bar mb-4 d-flex align-items-center p-1" style="background: var(--bg-card); border: 2px solid var(--gold-primary); border-radius: var(--radius-lg); box-shadow: var(--shadow-gold);">
                         <button class="location-btn btn btn-ghost" style="border-radius: 50%; padding: 10px;" onclick="app.requestLocation()"><i class="fa-solid fa-location-dot"></i></button>
-                        <input type="text" class="form-control" style="background: transparent; border: none; flex: 1; padding: 10px; color: #fff; text-align: right; outline: none; font-size: 1rem;" placeholder="ابحث باسم الحلاق أو بالصوت ...">
-                        <button class="voice-btn btn btn-primary" style="border-radius: 50%; width: 50px; height: 50px; padding: 0;" onclick="app.simulateNotification()"><i class="fa-solid fa-microphone"></i></button>
+                        <input type="text" id="client-search-input" class="form-control" style="background: transparent; border: none; flex: 1; padding: 10px; color: #fff; text-align: right; outline: none; font-size: 1rem;" placeholder="${window.i18n[app.language].searchPlaceholder}" onkeyup="app.filterBarbers()">
+                        <button class="voice-btn btn btn-primary" style="border-radius: 50%; width: 50px; height: 50px; padding: 0;" onclick="app.startVoiceSearch(this)"><i class="fa-solid fa-microphone"></i></button>
                     </div>
-                    <h3 class="mb-3 text-right">صالونات مقترحة لك</h3>
+                    <h3 class="mb-3 text-right">${window.i18n[app.language].suggestedBarbers}</h3>
                     <div class="barbers-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                         ${barbersHtml}
                     </div>
@@ -104,7 +107,7 @@ const UI = {
                     </div>
                 </div>
                 <div class="service-action">
-                    <button class="btn btn-primary" onclick="app.navigate('bookingFlow', { barberId: ${barber.id}, serviceId: ${s.id} })">حجز الموعد</button>
+                    <button class="btn btn-primary" onclick="app.navigate('bookingFlow', { barberId: ${barber.id}, serviceId: ${s.id} })">${window.i18n[app.language].bookAppointment}</button>
                 </div>
             </div>
         `).join('');
@@ -132,21 +135,21 @@ const UI = {
                     ${crowdHtml}
                     <p class="text-muted mb-4" style="font-size: 0.9rem;">"${barber.bio}"</p>
                     
-                    <h3 class="text-right text-gold mb-3"><i class="fa-regular fa-calendar"></i> الحجز والخدمات</h3>
+                    <h3 class="text-right text-gold mb-3"><i class="fa-regular fa-calendar"></i> ${window.i18n[app.language].services}</h3>
                     <div class="services-container mb-4">${servicesHtml}</div>
 
                     <div class="ai-camera-box pill-box pill-box-outline cursor-pointer" onclick="app.navigate('aiCamera')">
                         <div class="ai-icon"><i class="fa-solid fa-camera"></i></div>
-                        <h3 class="text-gold mb-1">مرآة الذكاء الاصطناعي</h3>
-                        <p class="text-muted" style="font-size: 0.8rem;">افتح الكاميرا لاكتشاف القصة المثالية</p>
+                        <h3 class="text-gold mb-1">${window.i18n[app.language].aiMirror}</h3>
+                        <p class="text-muted" style="font-size: 0.8rem;">${window.i18n[app.language].aiDesc}</p>
                     </div>
 
-                    <h3 class="text-right text-gold mb-3"><i class="fa-solid fa-map-location-dot"></i> الموقع والتواصل</h3>
+                    <h3 class="text-right text-gold mb-3"><i class="fa-solid fa-map-location-dot"></i> ${window.i18n[app.language].location}</h3>
                     
                     <div class="address-box">
                         <button class="btn btn-ghost" style="padding: 5px 10px; border: 1px solid var(--gold-primary); color: var(--gold-primary);"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>
                         <div class="text-right">
-                            <div class="text-muted" style="font-size: 0.8rem;">عنوان الصالون</div>
+                            <div class="text-muted" style="font-size: 0.8rem;">${window.i18n[app.language].address}</div>
                             <div style="font-weight: bold; font-size: 1.1rem; color: #fff;">${barber.location}</div>
                         </div>
                         <div class="address-icon"><i class="fa-solid fa-location-dot"></i></div>
@@ -157,6 +160,7 @@ const UI = {
                         <div class="social-icon whatsapp" onclick="window.open('https://wa.me/${barber.social && barber.social.whatsapp ? barber.social.whatsapp : barber.phone}')"><i class="fa-brands fa-whatsapp"></i><span>Whatsapp</span></div>
                         ${barber.social && barber.social.facebook ? `<div class="social-icon facebook" onclick="window.open('${barber.social.facebook}')"><i class="fa-brands fa-facebook-f"></i><span>FB</span></div>` : `<div class="social-icon facebook" style="opacity: 0.5;"><i class="fa-brands fa-facebook-f"></i><span>FB</span></div>`}
                         ${barber.social && barber.social.instagram ? `<div class="social-icon instagram" onclick="window.open('${barber.social.instagram}')"><i class="fa-brands fa-instagram"></i><span>Insta</span></div>` : `<div class="social-icon instagram" style="opacity: 0.5;"><i class="fa-brands fa-instagram"></i><span>Insta</span></div>`}
+                        ${barber.social && barber.social.website ? `<div class="social-icon website" style="color: #3498db;" onclick="window.open('${barber.social.website}')"><i class="fa-solid fa-globe"></i><span>Web</span></div>` : `<div class="social-icon website" style="opacity: 0.5; color: #3498db;"><i class="fa-solid fa-globe"></i><span>Web</span></div>`}
                     </div>
 
                     ${barber.settings.enableEmergency ? `
@@ -187,8 +191,9 @@ const UI = {
                         `).join('')}
                     </div>
                     <div id="tab-content-gallery" class="products-grid profile-tab-content mb-5" style="display: none;">
-                        <div class="product-card"><img src="https://images.unsplash.com/photo-1599351431202-1e0f0137899a?w=400&q=80" style="height: 150px;"></div>
-                        <div class="product-card"><img src="https://images.unsplash.com/photo-1622286342621-4bd786c2447c?w=400&q=80" style="height: 150px;"></div>
+                        ${barber.gallery && barber.gallery.length > 0 ? barber.gallery.map(img => `
+                            <div class="product-card"><img src="${img}" style="height: 150px; object-fit: cover;"></div>
+                        `).join('') : '<div class="text-center text-muted w-100 p-3">لا توجد صور في المعرض حالياً</div>'}
                     </div>
                     <div id="tab-content-reviews" class="profile-tab-content mb-5 text-right" style="display: none;">
                         <div class="pill-box">
@@ -568,6 +573,11 @@ const UI = {
                             <input type="text" id="barber-edit-location" class="form-control" style="width: 100%; background: var(--bg-main); border: 1px solid var(--border-color); color: #fff; padding: 15px; border-radius: var(--radius-sm); text-align: right; font-size: 1rem;" value="${barber.location}">
                         </div>
 
+                        <div class="form-group mb-4">
+                            <label class="text-gold mb-2 d-block" style="font-weight: bold;"><i class="fa-solid fa-globe" style="color: #3498db;"></i> رابط موقعك الإلكتروني (Website)</label>
+                            <input type="text" id="barber-edit-website" class="form-control" style="width: 100%; background: var(--bg-main); border: 1px solid var(--border-color); color: #fff; padding: 15px; border-radius: var(--radius-sm); text-align: right; font-size: 1rem;" value="${(barber.social && barber.social.website) || ''}" placeholder="https://yourwebsite.com">
+                        </div>
+
                         <div class="pill-box p-3 mb-4 mt-4 text-right" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color);">
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <div>
@@ -732,7 +742,8 @@ const UI = {
 
                 <!-- Page 5: Store -->
                 <div id="bdash-content-5" class="bdash-content" style="display: none;">
-                     <div class="pill-box p-3 mb-4 text-center cursor-pointer" style="border: 2px dashed var(--gold-primary); background: rgba(212, 175, 55, 0.05);" onclick="app.simulateAddProduct()">
+                     <input type="file" id="product-image-upload" accept="image/*" style="display: none;" onchange="app.handleProductImageUpload(event)">
+                     <div class="pill-box p-3 mb-4 text-center cursor-pointer" style="border: 2px dashed var(--gold-primary); background: rgba(212, 175, 55, 0.05);" onclick="app.addProduct()">
                          <h4 class="text-gold m-0"><i class="fa-solid fa-box-open"></i> إضافة منتج جديد للمتجر</h4>
                          <div class="text-muted mt-1" style="font-size: 0.85rem;">أضف صورة واسم المنتج مع السعر لبيعه لعملائك</div>
                      </div>
@@ -755,23 +766,18 @@ const UI = {
 
                 <!-- Page 7: Gallery -->
                 <div id="bdash-content-7" class="bdash-content" style="display: none;">
-                    <div class="pill-box p-3 mb-4 text-center cursor-pointer" style="border: 2px dashed var(--gold-primary); background: rgba(212, 175, 55, 0.05);" onclick="app.simulateAddGalleryImage()">
+                    <input type="file" id="gallery-image-upload" accept="image/*" style="display: none;" onchange="app.handleImageUpload(event, 'gallery')">
+                    <div class="pill-box p-3 mb-4 text-center cursor-pointer" style="border: 2px dashed var(--gold-primary); background: rgba(212, 175, 55, 0.05);" onclick="document.getElementById('gallery-image-upload').click()">
                          <h4 class="text-gold m-0"><i class="fa-solid fa-images"></i> رفع صورة جديدة لمعرض الأعمال</h4>
                          <div class="text-muted mt-1" style="font-size: 0.85rem;">الصور تجذب العملاء الجدد بنسبة 70% أكثر</div>
                      </div>
                      <div class="products-grid" id="gallery-images-list" style="grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                         ${barber.gallery && barber.gallery.length > 0 ? barber.gallery.map((img, idx) => `
                          <div style="position: relative;">
-                             <button class="btn btn-ghost text-danger p-1" style="position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.6); border-radius: 50%; z-index: 2;" onclick="this.parentElement.remove()"><i class="fa-solid fa-xmark"></i></button>
-                             <img src="https://images.unsplash.com/photo-1593980634289-cb4eb5f7a0b3?w=400&q=80" style="width: 100%; height: 100px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border-color);">
+                             <button class="btn btn-ghost text-danger p-1" style="position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.6); border-radius: 50%; z-index: 2;" onclick="app.deleteGalleryImage(this, ${idx})"><i class="fa-solid fa-xmark"></i></button>
+                             <img src="${img}" style="width: 100%; height: 100px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border-color);">
                          </div>
-                         <div style="position: relative;">
-                             <button class="btn btn-ghost text-danger p-1" style="position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.6); border-radius: 50%; z-index: 2;" onclick="this.parentElement.remove()"><i class="fa-solid fa-xmark"></i></button>
-                             <img src="https://images.unsplash.com/photo-1622286342621-4bd786c2447c?w=400&q=80" style="width: 100%; height: 100px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border-color);">
-                         </div>
-                         <div style="position: relative;">
-                             <button class="btn btn-ghost text-danger p-1" style="position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.6); border-radius: 50%; z-index: 2;" onclick="this.parentElement.remove()"><i class="fa-solid fa-xmark"></i></button>
-                             <img src="https://images.unsplash.com/photo-1512496015851-a1fbbfc61a4b?w=400&q=80" style="width: 100%; height: 100px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border-color);">
-                         </div>
+                         `).join('') : '<div class="text-muted text-center w-100 p-3">لم تقم برفع أي صور بعد</div>'}
                      </div>
                 </div>
 
