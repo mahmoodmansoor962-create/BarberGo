@@ -264,10 +264,13 @@ const UI = {
                         <div class="schedule-grid">
                             ${(() => {
                                 const allSlots = ['10:00 ص','10:30 ص','11:00 ص','11:30 ص','12:00 م','12:30 م','01:00 م','01:30 م','02:00 م','02:30 م','03:00 م','03:30 م','04:00 م','04:30 م','05:00 م','05:30 م','06:00 م','06:30 م','07:00 م','07:30 م','08:00 م','08:30 م','09:00 م','09:30 م','10:00 م'];
-                                const bookedVisualSlots = ['11:00 ص', '12:00 م', '03:30 م', '06:00 م', '07:30 م']; // Mocked visual slots for demonstration based on the user's audio
+                                const barber = window.db.barbers.find(b => b.id === barberId);
+                                const blockedTimes = barber.blockedTimes || [];
+                                const bookedTimes = window.db.bookings.filter(b => b.barber_id === barberId).map(b => b.time);
+                                
                                 return allSlots.map(time => {
-                                    if (bookedVisualSlots.includes(time)) {
-                                        return `<div class="time-slot disabled" style="background: rgba(231,76,60,0.1); border: 1px dashed #e74c3c; color: #e74c3c; opacity: 0.7;" title="الوقت محجوز" onclick="app.simulateNotificationError('هذا الوقت محجوز مسبقاً')">${time}</div>`;
+                                    if (blockedTimes.includes(time) || bookedTimes.includes(time)) {
+                                        return `<div class="time-slot disabled" style="background: rgba(231,76,60,0.1); border: 1px dashed #e74c3c; color: #e74c3c; opacity: 0.7;" title="الوقت محجوز" onclick="app.simulateNotificationError('هذا الوقت غير متاح')">${time}</div>`;
                                     } else {
                                         return `<div class="time-slot" onclick="app.selectTime(this)">${time}</div>`;
                                     }
@@ -307,9 +310,13 @@ const UI = {
             <div class="page container py-4 text-center">
                 <p class="text-gold mb-3" style="font-size: 0.9rem;"><i class="fa-solid fa-wand-magic-sparkles"></i> دع الذكاء الاصطناعي يقترح القصة الأنسب لملامحك</p>
                 <div class="camera-container border-gold" style="position: relative; overflow: hidden; border-radius: 12px; margin: 0 auto; max-width: 300px; height: 350px;">
-                    <!-- default face for camera simulation -->
-                    <img id="ai-camera-feed" src="https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=500&q=80" style="width: 100%; height: 100%; object-fit: cover;">
+                    <img id="ai-camera-placeholder" src="https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=500&q=80" style="width: 100%; height: 100%; object-fit: cover;">
+                    <video id="ai-camera-feed" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; display: none;"></video>
+                    <img id="ai-mock-result" style="width: 100%; height: 100%; object-fit: cover; display: none;">
                     <div id="ai-scan-line" class="scan-line"></div>
+                    <button id="flip-camera-btn" class="btn btn-ghost" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); color: #fff; padding: 5px 10px; border-radius: 20px; font-size: 0.8rem; display: none; z-index: 10; border: 1px solid var(--gold-primary);" onclick="app.flipCamera()">
+                        <i class="fa-solid fa-camera-rotate"></i> قلب الكاميرا
+                    </button>
                 </div>
                 
                 <div id="ai-results-actions" style="display: none;" class="mt-4">
@@ -753,19 +760,24 @@ const UI = {
                     <div class="pill-box text-right">
                         <h4 class="text-danger mb-3" style="font-size: 1.1rem;"><i class="fa-solid fa-ban"></i> قفل أوقات (طوارئ / استراحة)</h4>
                         <p class="text-muted mb-3" style="font-size: 0.85rem; line-height: 1.5;">اضغط على أي وقت لتقوم بإغلاقه حتى وإن لم يكن هناك حجز مسبق، وسيظهر للعملاء كـ "غير متاح".</p>
-                        <div class="schedule-grid" style="grid-template-columns: repeat(3, 1fr); gap: 8px;">
+                        <div class="schedule-grid" id="barber-block-grid" style="grid-template-columns: repeat(3, 1fr); gap: 8px;">
                             ${(() => {
                                 const allSlots = ['10:00 ص','10:30 ص','11:00 ص','11:30 ص','12:00 م','12:30 م','01:00 م','01:30 م','02:00 م','02:30 م','03:00 م','03:30 م','04:00 م','04:30 م','05:00 م','05:30 م','06:00 م','06:30 م','07:00 م','07:30 م','08:00 م','08:30 م','09:00 م','09:30 م','10:00 م'];
-                                const bookedVisualSlots = ['11:00 ص', '12:00 م', '03:30 م', '06:00 م', '07:30 م'];
+                                const blockedTimes = barber.blockedTimes || [];
+                                const bookedTimes = window.db.bookings.filter(b => b.barber_id === barber.id).map(b => b.time);
+                                
                                 return allSlots.map(time => {
-                                    if (bookedVisualSlots.includes(time)) {
-                                        return `<div class="time-slot disabled" style="background: rgba(231,76,60,0.2); border: 1px dashed #e74c3c; color: #e74c3c; opacity: 1;" onclick="app.simulateNotificationError('حاول إلغاء الحجز من القائمة أولاً')">${time} (محجوز)</div>`;
+                                    if (bookedTimes.includes(time)) {
+                                        return `<div class="time-slot disabled" style="background: rgba(231,76,60,0.2); border: 1px dashed #e74c3c; color: #e74c3c; opacity: 1;" onclick="app.simulateNotificationError('حاول إلغاء الحجز من القائمة أولاً')">${time} (حجز فعلي)</div>`;
+                                    } else if (blockedTimes.includes(time)) {
+                                        return `<div class="time-slot blocked-slot selected" style="background: #e74c3c; border-color: #e74c3c; opacity: 0.8; color: #fff;" onclick="app.toggleBlockTime(this)">${time}</div>`;
                                     } else {
                                         return `<div class="time-slot" onclick="app.toggleBlockTime(this)">${time}</div>`;
                                     }
                                 }).join('');
                             })()}
                         </div>
+                        <button class="btn btn-primary w-100 mt-3" onclick="app.saveBlockedTimes()">حفظ الأوقات المقفلة</button>
                     </div>
                 </div>
 
