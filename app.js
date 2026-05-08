@@ -897,6 +897,49 @@ class App {
     updateSubscriptionPrice() {
         window.notifier.show("تم التحديث", "تم حفظ أسعار الاشتراكات الجديدة كباقة أساسية للصالونات.", "success");
     }
+
+    // ==========================================
+    // Admin New Operational Features
+    // ==========================================
+    acceptPayment(reqId, salonName) {
+        const reqEl = document.getElementById(reqId);
+        if (reqEl) {
+            reqEl.style.display = 'none';
+            window.notifier.show("تم التفعيل", `تم قبول الحوالة المالية وتفعيل اشتراك صالون ${salonName} بنجاح.`, "success");
+        }
+    }
+
+    rejectPayment(reqId) {
+        const reason = prompt("يرجى إدخال سبب رفض طلب التفعيل لإرساله للحلاق:");
+        if (reason !== null) {
+            const reqEl = document.getElementById(reqId);
+            if (reqEl) {
+                reqEl.style.display = 'none';
+                window.notifier.show("تم الرفض", `تم رفض الحوالة وإرسال السبب "${reason}" للصالون.`, "error");
+            }
+        }
+    }
+
+    sendBroadcast() {
+        const target = document.getElementById('broadcast-target').value;
+        const msg = document.getElementById('broadcast-message').value;
+        
+        if (!msg.trim()) {
+            window.notifier.show("خطأ", "لا يمكن إرسال رسالة فارغة.", "warning");
+            return;
+        }
+
+        let targetName = target === 'all' ? 'جميع المستخدمين' : target === 'barbers' ? 'جميع الحلاقين' : 'جميع العملاء';
+        window.notifier.show("تم البث", `تم إرسال الإشعار لـ ${targetName} بنجاح!`, "success");
+        document.getElementById('broadcast-message').value = '';
+    }
+
+    downloadFinancialReport(barberId, barberName) {
+        window.notifier.show("جاري التحميل...", `يتم الآن استخراج التقرير المالي الشامل لصالون ${barberName} بصيغة PDF...`, "info");
+        setTimeout(() => {
+            window.notifier.show("اكتمل التحميل", `تم حفظ التقرير المالي لـ ${barberName} في جهازك.`, "success");
+        }, 2000);
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
