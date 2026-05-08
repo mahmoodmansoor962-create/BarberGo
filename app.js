@@ -307,10 +307,26 @@ class App {
             element.style.background = '#e74c3c';
             element.style.borderColor = '#e74c3c';
             element.style.opacity = '0.8';
+            element.style.color = '#fff';
         } else {
             element.style.background = 'var(--bg-main)';
             element.style.borderColor = 'var(--border-color)';
             element.style.opacity = '1';
+            element.style.color = '';
+        }
+    }
+
+    saveBlockedTimes() {
+        const barberIdStr = localStorage.getItem('barbergo_session');
+        if (!barberIdStr) return;
+        const barberId = parseInt(barberIdStr.split('_')[1]);
+        const barber = window.db.barbers.find(b => b.id === barberId);
+        if (barber) {
+            const blockedSlotsElements = document.querySelectorAll('#barber-block-grid .blocked-slot');
+            const blockedTimes = Array.from(blockedSlotsElements).map(el => el.textContent.trim());
+            barber.blockedTimes = blockedTimes;
+            window.saveDB();
+            window.notifier.show('تم الحفظ', 'تم حفظ الأوقات المقفلة بنجاح. لن يتمكن العملاء من حجز هذه الأوقات.', 'success');
         }
     }
 
@@ -593,22 +609,33 @@ class App {
     startAIScanning(btn) {
         const scanLine = document.getElementById('ai-scan-line');
         const feed = document.getElementById('ai-camera-feed');
+        const placeholder = document.getElementById('ai-camera-placeholder');
         const mockResult = document.getElementById('ai-mock-result');
+        const flipBtn = document.getElementById('flip-camera-btn');
         if (!scanLine || !feed) return;
 
         btn.innerHTML = '<i class="fa-solid fa-camera fa-fade"></i> جاري فتح الكاميرا...';
         btn.disabled = true;
 
+        if (!this.currentFacingMode) this.currentFacingMode = 'user';
+
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: this.currentFacingMode } })
                 .then(stream => {
+                    this.aiStream = stream;
                     feed.srcObject = stream;
+                    if (placeholder) placeholder.style.display = 'none';
+                    feed.style.display = 'block';
+                    if (flipBtn) flipBtn.style.display = 'block';
                     scanLine.style.display = 'block';
                     window.notifier.show("الكاميرا نشطة", "يتم الآن تحليل ملامح وجهك...", "info");
 
                     setTimeout(() => {
-                        stream.getTracks().forEach(track => track.stop());
+                        if (this.aiStream) {
+                            this.aiStream.getTracks().forEach(track => track.stop());
+                        }
                         feed.style.display = 'none';
+                        if (flipBtn) flipBtn.style.display = 'none';
                         mockResult.style.display = 'block';
                         mockResult.src = 'https://images.unsplash.com/photo-1599351431202-1e0f0137899a?w=400&q=80';
                         scanLine.style.display = 'none';
@@ -622,6 +649,29 @@ class App {
                     btn.innerHTML = '<i class="fa-solid fa-camera"></i> تحليل وجهي الآن';
                     btn.disabled = false;
                     window.notifier.show("إذن مرفوض", "يرجى إعطاء صلاحية الكاميرا لتعمل مرآة الذكاء.", "error");
+                });
+        } else {
+            window.notifier.show("غير مدعوم", "متصفحك لا يدعم فتح الكاميرا.", "error");
+            btn.innerHTML = '<i class="fa-solid fa-camera"></i> تحليل وجهي الآن';
+            btn.disabled = false;
+        }
+    }
+
+    flipCamera() {
+        if (this.aiStream) {
+            this.aiStream.getTracks().forEach(track => track.stop());
+        }
+        this.currentFacingMode = this.currentFacingMode === 'user' ? 'environment' : 'user';
+        
+        const feed = document.getElementById('ai-camera-feed');
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: this.currentFacingMode } })
+                .then(stream => {
+                    this.aiStream = stream;
+                    feed.srcObject = stream;
+                })
+                .catch(err => {
+                    window.notifier.show("خطأ", "لم نتمكن من التبديل للكاميرا الأخرى.", "error");
                 });
         }
     }
