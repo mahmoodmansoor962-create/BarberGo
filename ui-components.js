@@ -314,10 +314,13 @@ const UI = {
                 
                 <div id="ai-results-actions" style="display: none;" class="mt-4">
                     <h4 class="text-success mb-3" style="font-size: 1rem;"><i class="fa-solid fa-check-circle"></i> تم العثور على القصة المثالية!</h4>
-                    <button class="btn btn-outline mb-2 w-100" onclick="window.notifier.show('تم التحميل', 'تم حفظ الصورة في الاستوديو بنجاح لتعرضها للحلاق.', 'success')">
+                    <button class="btn btn-primary mb-2 w-100" onclick="window.notifier.show('تم الإرسال', 'تم إرسال الصورة بنجاح. سيقوم الحلاق بالاطلاع عليها لتجهيز القصة!', 'success')">
+                        <i class="fa-solid fa-paper-plane"></i> إرسال الصورة للحلاق
+                    </button>
+                    <button class="btn btn-outline mb-2 w-100" onclick="window.notifier.show('تم التحميل', 'تم حفظ الصورة في الاستوديو بنجاح.', 'success')">
                         <i class="fa-solid fa-download"></i> تحميل الصورة لجهازي
                     </button>
-                    <button class="btn btn-primary w-100" onclick="app.navigate('clientHome')">ابحث عن حلاق لتنفيذها</button>
+                    <button class="btn btn-ghost w-100 text-gold" onclick="app.navigate('clientHome')">العودة للرئيسية</button>
                 </div>
 
                 <div id="ai-scan-btn-container" class="mt-4">
@@ -679,6 +682,7 @@ const UI = {
                         </div>
                     `).join('')}
                     </div>
+                    <button class="btn btn-primary w-100 mt-3" onclick="window.notifier.show('تم الحفظ', 'تم حفظ الخدمات بنجاح وستظهر للعملاء الآن.', 'success')">حفظ الخدمات والتغييرات</button>
                 </div>
 
                 <!-- Page 4: Calendar -->
@@ -732,7 +736,7 @@ const UI = {
                                 <div class="text-muted" style="font-size: 0.85rem;"><i class="fa-regular fa-clock"></i> اليوم, 04:30 م</div>
                             </div>
                             <div class="text-white mb-3" style="font-size: 0.9rem;"><i class="fa-solid fa-scissors text-muted"></i> قصة شعر مودرن مع سشوار</div>
-                            <button class="btn w-100 mt-2 text-danger" style="background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.3); font-weight: bold; padding: 10px;" onclick="app.cancelBookingAlert()">إلغاء الحجز وإرسال تنبيه للعميل</button>
+                            <button class="btn w-100 mt-2 text-danger" style="background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.3); font-weight: bold; padding: 10px;" onclick="app.cancelBooking(this, 'أحمد محمد')">إلغاء الحجز وإرسال تنبيه للعميل</button>
                         </div>
                         
                         <div class="booking-item p-3" style="background: var(--bg-main); border: 1px solid var(--border-color); border-radius: var(--radius-sm); border-right: 3px solid #2ecc71;">
@@ -741,7 +745,7 @@ const UI = {
                                 <div class="text-muted" style="font-size: 0.85rem;"><i class="fa-regular fa-clock"></i> اليوم, 06:00 م</div>
                             </div>
                             <div class="text-white mb-3" style="font-size: 0.9rem;"><i class="fa-solid fa-scissors text-muted"></i> تنظيف بشرة كامل</div>
-                            <button class="btn w-100 mt-2 text-danger" style="background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.3); font-weight: bold; padding: 10px;" onclick="app.cancelBookingAlert()">إلغاء الحجز وإرسال تنبيه للعميل</button>
+                            <button class="btn w-100 mt-2 text-danger" style="background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.3); font-weight: bold; padding: 10px;" onclick="app.cancelBooking(this, 'خالد عبد الله')">إلغاء الحجز وإرسال تنبيه للعميل</button>
                         </div>
                     </div>
 
@@ -813,6 +817,7 @@ const UI = {
                          </div>
                          `).join('') : '<div class="text-muted text-center w-100 p-3">لم تقم برفع أي صور بعد</div>'}
                      </div>
+                     <button class="btn btn-primary w-100 mt-4" onclick="window.notifier.show('تم الحفظ', 'تم حفظ الصور في المعرض بنجاح وستظهر للعملاء الآن.', 'success')">حفظ الصور في المعرض</button>
                 </div>
 
                 <!-- Page 8: Customer Reviews -->
@@ -913,6 +918,7 @@ const UI = {
             const trialBtn = `<button class="btn btn-outline text-gold p-1 ml-2" style="border-color: var(--gold-primary); font-size: 0.75rem; width: 80px;" onclick="app.manageBarberTrial(${b.id})"><i class="fa-solid fa-clock"></i> التجربة</button>`;
             const deleteBtn = `<button class="btn btn-ghost text-danger p-1 ml-2" style="font-size: 1rem;" onclick="app.deleteBarber(${b.id})"><i class="fa-solid fa-trash"></i></button>`;
             const alertBtn = `<button class="btn text-warning p-1" style="font-size: 1rem;" onclick="app.sendSubscriptionAlert('${b.name}')"><i class="fa-solid fa-bell"></i></button>`;
+            const pdfBtn = `<button class="btn text-info p-1 ml-2" style="font-size: 1rem;" onclick="app.downloadFinancialReport(${b.id}, '${b.name}')"><i class="fa-solid fa-file-pdf"></i></button>`;
 
             return `
                 <div class="pill-box p-3 mb-3 d-flex flex-column" style="border-right: 3px solid ${isBlocked ? '#e74c3c' : 'var(--gold-primary)'};">
@@ -925,6 +931,7 @@ const UI = {
                             </div>
                         </div>
                         <div>
+                            ${pdfBtn}
                             ${alertBtn}
                             ${deleteBtn}
                         </div>
@@ -955,12 +962,13 @@ const UI = {
                 <!-- Admin Tabs -->
                 <div class="tabs-container mb-4" style="overflow-x: auto; white-space: nowrap; gap: 10px; border-bottom: none; padding-bottom: 10px;">
                     <button class="btn btn-ghost admin-tab-item active" id="admin-tab-1" onclick="app.switchAdminTab(1)"><i class="fa-solid fa-chart-pie"></i> نظرة عامة</button>
+                    <button class="btn btn-ghost admin-tab-item" id="admin-tab-5" onclick="app.switchAdminTab(5)"><i class="fa-solid fa-file-invoice-dollar"></i> التفعيل</button>
                     <button class="btn btn-ghost admin-tab-item" id="admin-tab-2" onclick="app.switchAdminTab(2)"><i class="fa-solid fa-money-bill-wave"></i> تحصيل الأرباح</button>
                     <button class="btn btn-ghost admin-tab-item" id="admin-tab-3" onclick="app.switchAdminTab(3)"><i class="fa-solid fa-tags"></i> الاشتراكات</button>
                     <button class="btn btn-ghost admin-tab-item" id="admin-tab-4" onclick="app.switchAdminTab(4)"><i class="fa-solid fa-users-gear"></i> الصالونات</button>
                 </div>
 
-                <!-- Tab 1: Global Analytics -->
+                <!-- Tab 1: Global Analytics & Monitoring -->
                 <div id="admin-content-1" class="admin-content">
                     <h3 class="text-gold text-right mb-3">حالة المنصة</h3>
                     <div class="products-grid mb-4" style="grid-template-columns: 1fr 1fr; gap: 10px;">
@@ -979,6 +987,82 @@ const UI = {
                     <div class="pill-box mb-4 text-right">
                         <h4 class="text-white mb-3"><i class="fa-solid fa-arrow-trend-up text-gold"></i> نمو الاشتراكات الشهرية</h4>
                         <canvas id="growthChart" height="180"></canvas>
+                    </div>
+
+                    <!-- Top Performing Salons -->
+                    <div class="pill-box mb-4 text-right">
+                        <h4 class="text-gold mb-3"><i class="fa-solid fa-trophy"></i> الصالونات الأكثر أداءً</h4>
+                        <p class="text-muted mb-3" style="font-size: 0.8rem;">بناءً على عدد الحجوزات الشهرية</p>
+                        ${barbers.slice(0, 3).map((b, i) => `
+                            <div class="d-flex justify-content-between align-items-center mb-2 pb-2" style="border-bottom: 1px solid var(--border-color);">
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="text-gold" style="font-weight: bold; width: 20px;">#${i + 1}</div>
+                                    <img src="${b.image}" width="30" height="30" style="border-radius: 50%; object-fit: cover;">
+                                    <span class="text-white" style="font-size: 0.9rem;">${b.name}</span>
+                                </div>
+                                <div class="text-success" style="font-size: 0.85rem;"><i class="fa-solid fa-calendar-check"></i> ${Math.floor(Math.random() * 100) + 20} حجز</div>
+                            </div>
+                        `).join('')}
+                    </div>
+
+                    <!-- Activity Log -->
+                    <div class="pill-box mb-4 text-right">
+                        <h4 class="text-white mb-3"><i class="fa-solid fa-clock-rotate-left text-gold"></i> سجل نشاطات الحلاقين</h4>
+                        <div class="activity-log-item mb-2 pb-2 text-right" style="border-bottom: 1px solid var(--border-color);">
+                            <div class="text-white" style="font-size: 0.85rem;"><i class="fa-solid fa-right-to-bracket text-muted"></i> صالون المقص الذهبي قام بتسجيل الدخول</div>
+                            <div class="text-muted" style="font-size: 0.7rem;">منذ 5 دقائق</div>
+                        </div>
+                        <div class="activity-log-item mb-2 pb-2 text-right" style="border-bottom: 1px solid var(--border-color);">
+                            <div class="text-white" style="font-size: 0.85rem;"><i class="fa-solid fa-tag text-info"></i> صالون الشباب قام بتعديل تسعيرة "تنظيف البشرة"</div>
+                            <div class="text-muted" style="font-size: 0.7rem;">منذ 15 دقيقة</div>
+                        </div>
+                        <div class="activity-log-item text-right">
+                            <div class="text-white" style="font-size: 0.85rem;"><i class="fa-solid fa-trash text-danger"></i> صالون الأناقة قام بحذف حجز العميل (أحمد)</div>
+                            <div class="text-muted" style="font-size: 0.7rem;">منذ 40 دقيقة</div>
+                        </div>
+                    </div>
+
+                    <!-- Heatmap (Simulated visually) -->
+                    <div class="pill-box mb-4 text-right">
+                        <h4 class="text-gold mb-3"><i class="fa-solid fa-map-location-dot"></i> خريطة النشاط (توزع الصالونات)</h4>
+                        <div class="d-flex flex-column gap-3">
+                            <div>
+                                <div class="d-flex justify-content-between mb-1" style="font-size: 0.85rem;">
+                                    <span class="text-white">عَمّان</span>
+                                    <span class="text-gold">65%</span>
+                                </div>
+                                <div style="width: 100%; background: #222; border-radius: 4px; height: 8px; overflow: hidden;">
+                                    <div style="width: 65%; background: var(--gold-primary); height: 100%;"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="d-flex justify-content-between mb-1" style="font-size: 0.85rem;">
+                                    <span class="text-white">إربد</span>
+                                    <span class="text-gold">20%</span>
+                                </div>
+                                <div style="width: 100%; background: #222; border-radius: 4px; height: 8px; overflow: hidden;">
+                                    <div style="width: 20%; background: var(--gold-primary); height: 100%;"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="d-flex justify-content-between mb-1" style="font-size: 0.85rem;">
+                                    <span class="text-white">الزرقاء</span>
+                                    <span class="text-gold">10%</span>
+                                </div>
+                                <div style="width: 100%; background: #222; border-radius: 4px; height: 8px; overflow: hidden;">
+                                    <div style="width: 10%; background: var(--gold-primary); height: 100%;"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="d-flex justify-content-between mb-1" style="font-size: 0.85rem;">
+                                    <span class="text-white">باقي المحافظات</span>
+                                    <span class="text-gold">5%</span>
+                                </div>
+                                <div style="width: 100%; background: #222; border-radius: 4px; height: 8px; overflow: hidden;">
+                                    <div style="width: 5%; background: var(--gold-primary); height: 100%;"></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <h3 class="text-gold text-right mb-3">تذاكر الدعم الفني</h3>
@@ -1034,20 +1118,88 @@ const UI = {
                     </div>
 
                     <div class="pill-box text-right mb-4 border-gold" style="background: rgba(212, 175, 55, 0.05);">
-                        <h4 class="text-gold mb-2"><i class="fa-solid fa-robot"></i> أداة التنبيه الآلي</h4>
+                        <h4 class="text-gold mb-2"><i class="fa-solid fa-robot"></i> أداة التنبيه الآلي (WhatsApp API)</h4>
                         <p class="text-white mb-3" style="font-size: 0.85rem; line-height: 1.5;">النظام يقوم حالياً بإرسال رسائل WhatsApp وتنبيهات داخلية للحلاقين قبل 3 أيام من انتهاء اشتراكهم بشكل آلي بالكامل.</p>
-                        <div class="text-success"><i class="fa-solid fa-circle-check"></i> تعمل الخدمة بكفاءة</div>
+                        
+                        <div class="d-flex justify-content-between text-center mt-3 pt-3" style="border-top: 1px solid var(--border-color);">
+                            <div>
+                                <div class="text-gold" style="font-size: 1.2rem; font-weight: bold;">842</div>
+                                <div class="text-muted" style="font-size: 0.7rem;">تم الإرسال</div>
+                            </div>
+                            <div style="width: 1px; background: var(--border-color);"></div>
+                            <div>
+                                <div class="text-success" style="font-size: 1.2rem; font-weight: bold;">98%</div>
+                                <div class="text-muted" style="font-size: 0.7rem;">نسبة النجاح</div>
+                            </div>
+                            <div style="width: 1px; background: var(--border-color);"></div>
+                            <div>
+                                <div class="text-danger" style="font-size: 1.2rem; font-weight: bold;">14</div>
+                                <div class="text-muted" style="font-size: 0.7rem;">فشل</div>
+                            </div>
+                        </div>
+                        <div class="text-success mt-3 text-center" style="font-size: 0.85rem;"><i class="fa-solid fa-circle-check"></i> الخوادم متصلة بالواتساب بنجاح</div>
                     </div>
                 </div>
 
-                <!-- Tab 4: Manage Barbers -->
+                <!-- Tab 4: Manage Barbers & Broadcast -->
                 <div id="admin-content-4" class="admin-content" style="display: none;">
+                    <div class="pill-box text-right mb-4" style="border: 1px solid var(--gold-primary);">
+                        <h4 class="text-gold mb-2"><i class="fa-solid fa-bullhorn"></i> أداة البث العام (Broadcast)</h4>
+                        <p class="text-muted mb-3" style="font-size: 0.85rem;">أرسل إشعارات وعروض ترويجية لجميع المستخدمين بضغطة زر.</p>
+                        <select id="broadcast-target" class="form-control mb-2 text-right" style="background: var(--bg-main); border: 1px solid var(--border-color); color: #fff;">
+                            <option value="all">إلى الجميع (حلاقين وعملاء)</option>
+                            <option value="barbers">إلى الحلاقين فقط</option>
+                            <option value="clients">إلى العملاء فقط</option>
+                        </select>
+                        <textarea id="broadcast-message" class="form-control mb-3 text-right" rows="2" placeholder="اكتب رسالتك هنا..." style="background: var(--bg-main); border: 1px solid var(--border-color); color: #fff;"></textarea>
+                        <button class="btn btn-primary w-100" onclick="app.sendBroadcast()"><i class="fa-solid fa-paper-plane"></i> إرسال البث الآن</button>
+                    </div>
+
                     <div class="d-flex justify-content-between align-items-center mb-3">
-                        <button class="btn btn-primary" style="font-size: 0.8rem; padding: 8px 12px;"><i class="fa-solid fa-bullhorn"></i> بث للجميع</button>
-                        <h3 class="text-gold m-0">قائمة الصالونات المشتركة</h3>
+                        <h3 class="text-gold m-0 w-100 text-right">قائمة الصالونات المشتركة</h3>
                     </div>
                     <div class="mb-5 text-right">
                         ${barbersRows}
+                    </div>
+                </div>
+
+                <!-- Tab 5: Payment Verification (Activation Requests) -->
+                <div id="admin-content-5" class="admin-content" style="display: none;">
+                    <h3 class="text-gold text-right mb-3"><i class="fa-solid fa-file-invoice-dollar"></i> طلبات التفعيل المعلقة</h3>
+                    <p class="text-muted text-right mb-4" style="font-size: 0.85rem;">راجع الحوالات الواردة من الحلاقين لتفعيل اشتراكاتهم يدوياً.</p>
+                    
+                    <!-- Mock Pending Request 1 -->
+                    <div class="pill-box mb-3 text-right" id="pending-req-1" style="border-right: 3px solid #f39c12;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="badge badge-warning text-dark">قيد المراجعة</span>
+                            <div class="text-white" style="font-weight: bold; font-size: 1.1rem;">صالون النجوم</div>
+                        </div>
+                        <div class="mb-3" style="font-size: 0.85rem; color: #ddd;">
+                            <p class="m-0"><i class="fa-solid fa-money-bill-transfer text-gold"></i> طريقة الدفع: كليك (CliQ)</p>
+                            <p class="m-0"><i class="fa-solid fa-hashtag text-gold"></i> الاسم المحول: AHMAD SALON</p>
+                            <p class="m-0"><i class="fa-solid fa-coins text-gold"></i> المبلغ: 15 JOD</p>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-primary" style="flex: 1;" onclick="app.acceptPayment('pending-req-1', 'صالون النجوم')"><i class="fa-solid fa-check"></i> تفعيل الحساب</button>
+                            <button class="btn btn-outline text-danger" style="flex: 1; border-color: #e74c3c;" onclick="app.rejectPayment('pending-req-1')"><i class="fa-solid fa-xmark"></i> رفض مع سبب</button>
+                        </div>
+                    </div>
+
+                    <!-- Mock Pending Request 2 -->
+                    <div class="pill-box mb-3 text-right" id="pending-req-2" style="border-right: 3px solid #f39c12;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="badge badge-warning text-dark">قيد المراجعة</span>
+                            <div class="text-white" style="font-weight: bold; font-size: 1.1rem;">أناقة رجل</div>
+                        </div>
+                        <div class="mb-3" style="font-size: 0.85rem; color: #ddd;">
+                            <p class="m-0"><i class="fa-solid fa-wallet text-gold"></i> طريقة الدفع: محفظة زين كاش</p>
+                            <p class="m-0"><i class="fa-solid fa-phone text-gold"></i> رقم المحول: 0791234567</p>
+                            <p class="m-0"><i class="fa-solid fa-coins text-gold"></i> المبلغ: 150 JOD (سنوي)</p>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-primary" style="flex: 1;" onclick="app.acceptPayment('pending-req-2', 'أناقة رجل')"><i class="fa-solid fa-check"></i> تفعيل الحساب</button>
+                            <button class="btn btn-outline text-danger" style="flex: 1; border-color: #e74c3c;" onclick="app.rejectPayment('pending-req-2')"><i class="fa-solid fa-xmark"></i> رفض مع سبب</button>
+                        </div>
                     </div>
                 </div>
 
