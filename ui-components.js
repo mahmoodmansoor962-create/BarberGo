@@ -163,10 +163,18 @@ const UI = {
                         ${barber.social && barber.social.website ? `<div class="social-icon website" style="color: #3498db;" onclick="window.open('${barber.social.website}')"><i class="fa-solid fa-globe"></i><span>Web</span></div>` : `<div class="social-icon website" style="opacity: 0.5; color: #3498db;"><i class="fa-solid fa-globe"></i><span>Web</span></div>`}
                     </div>
 
-                    ${barber.settings.enableEmergency ? `
-                        <div class="pill-box cursor-pointer" style="border: 1px solid #e74c3c; background: rgba(231, 76, 60, 0.1);" onclick="app.triggerEmergency()">
+                    ${barber.settings && barber.settings.enableEmergency ? `
+                        <div class="pill-box cursor-pointer mb-3" style="border: 1px solid #e74c3c; background: rgba(231, 76, 60, 0.1);" onclick="app.triggerEmergency()">
                             <h3 class="text-danger m-0 d-flex justify-content-center align-items-center gap-2">
                                 <i class="fa-solid fa-truck-medical"></i> طلب حجز طارئ!
+                            </h3>
+                        </div>
+                    ` : ''}
+
+                    ${barber.homeService ? `
+                        <div class="pill-box cursor-pointer mb-3" style="border: 1px solid #2ecc71; background: rgba(46, 204, 113, 0.1);">
+                            <h3 class="text-success m-0 d-flex justify-content-center align-items-center gap-2" style="font-size: 1.1rem;">
+                                <i class="fa-solid fa-house-chimney"></i> تتوفر خدمة الحلاقة المنزلية
                             </h3>
                         </div>
                     ` : ''}
@@ -198,10 +206,10 @@ const UI = {
                     <div id="tab-content-reviews" class="profile-tab-content mb-5 text-right" style="display: none;">
                         <div class="pill-box">
                             <div class="d-flex align-items-center gap-2 mb-2">
-                                <div style="font-weight: bold; font-size: 1.2rem; color: #fff;">4.9</div>
+                                <div style="font-weight: bold; font-size: 1.2rem; color: #fff;" id="barber-avg-rating">${barber.rating}</div>
                                 <div class="text-gold"><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star-half-stroke"></i></div>
                             </div>
-                            <p class="text-muted m-0">بناءً على 120 تقييم</p>
+                            <p class="text-muted m-0" id="barber-reviews-count">بناءً على ${barber.reviewsCount || 120} تقييم</p>
                         </div>
                         <div class="pill-box text-center mt-3">
                             <h4 class="text-gold mb-3">أضف تقييمك للحلاق</h4>
@@ -212,7 +220,7 @@ const UI = {
                                 <i class="fa-regular fa-star" onclick="app.rateBarber(4, this)"></i>
                                 <i class="fa-regular fa-star" onclick="app.rateBarber(5, this)"></i>
                             </div>
-                            <button class="btn btn-primary btn-block text-black" onclick="app.toggleSetting('إرسال التقييم', 'تم تسجيل تقييمك بنجاح!')">إرسال التقييم</button>
+                            <button class="btn btn-primary btn-block text-black" onclick="app.submitReview(${barber.id})">إرسال التقييم</button>
                         </div>
                     </div>
                     
