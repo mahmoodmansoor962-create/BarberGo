@@ -66,7 +66,8 @@ class App {
             if (session.startsWith('barber_')) {
                 const bId = parseInt(session.split('_')[1]);
                 this.navigate('barberDashboard', { id: bId });
-                const bName = window.db.barbers.find(b => b.id === bId)?.name || 'أيها الحلاق';
+                const foundBarber = window.db.barbers.find(b => b.id === bId);
+                const bName = foundBarber ? foundBarber.name : 'أيها الحلاق';
                 window.notifier.show("مرحباً بك", `أهلاً بك مجدداً في لوحة التحكم الخاصة بك يا ${bName}.`, "success");
                 return;
             } else if (session === 'client') {
@@ -184,6 +185,7 @@ class App {
             if (this.currentView === 'clientHome') {
                 this.navigate('clientHome');
             }
+        }
     }
 
     rateBarber(rating, element) {
@@ -280,10 +282,15 @@ class App {
     }
 
     saveBarberSettings() {
-        const bio = document.getElementById('barber-edit-bio')?.value;
-        const phone = document.getElementById('barber-edit-phone')?.value;
-        const whatsapp = document.getElementById('barber-edit-whatsapp')?.value;
-        const location = document.getElementById('barber-edit-location')?.value;
+        const bioEl = document.getElementById('barber-edit-bio');
+        const phoneEl = document.getElementById('barber-edit-phone');
+        const whatsappEl = document.getElementById('barber-edit-whatsapp');
+        const locationEl = document.getElementById('barber-edit-location');
+        
+        const bio = bioEl ? bioEl.value : undefined;
+        const phone = phoneEl ? phoneEl.value : undefined;
+        const whatsapp = whatsappEl ? whatsappEl.value : undefined;
+        const location = locationEl ? locationEl.value : undefined;
         
         const barberIdStr = localStorage.getItem('barbergo_session');
         if (!barberIdStr) return;
