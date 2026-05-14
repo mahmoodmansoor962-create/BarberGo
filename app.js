@@ -184,6 +184,121 @@ class App {
             if (this.currentView === 'clientHome') {
                 this.navigate('clientHome');
             }
+    }
+
+    rateBarber(rating, element) {
+        this.pendingRating = rating;
+        const container = element.parentElement;
+        const stars = container.querySelectorAll('i');
+        
+        // Note: Flex-direction is row-reverse, so index 0 is 5 stars, index 4 is 1 star.
+        stars.forEach((star, index) => {
+            const starValue = 5 - index;
+            if (starValue <= rating) {
+                star.classList.remove('fa-regular');
+                star.classList.add('fa-solid');
+            } else {
+                star.classList.remove('fa-solid');
+                star.classList.add('fa-regular');
+            }
+        });
+    }
+
+    submitReview(barberId) {
+        if (!this.pendingRating) {
+            window.notifier.show("خطأ", "يرجى اختيار عدد النجوم للتقييم.", "error");
+            return;
+        }
+
+        const barber = window.db.barbers.find(b => b.id === barberId);
+        if (barber) {
+            // Update rating logic
+            const currentTotal = barber.rating * (barber.reviewsCount || 120);
+            const newCount = (barber.reviewsCount || 120) + 1;
+            const newAvg = (currentTotal + this.pendingRating) / newCount;
+            
+            barber.rating = parseFloat(newAvg.toFixed(1));
+            barber.reviewsCount = newCount;
+            
+            window.saveDB();
+            
+            // Update UI
+            const ratingDisplay = document.getElementById('barber-avg-rating');
+            const reviewsCountDisplay = document.getElementById('barber-reviews-count');
+            
+            if (ratingDisplay) ratingDisplay.innerText = barber.rating;
+            if (reviewsCountDisplay) reviewsCountDisplay.innerText = `بناءً على ${barber.reviewsCount} تقييم`;
+            
+            window.notifier.show("إرسال التقييم", "تم تسجيل تقييمك بنجاح! شكراً لك.", "success");
+            this.pendingRating = 0;
+            
+            // Optional: reset stars visually
+            const stars = document.querySelectorAll('#barber-rating i');
+            stars.forEach(star => {
+                star.classList.remove('fa-solid');
+                star.classList.add('fa-regular');
+            });
+        }
+    }
+
+    toggleBarberSettingParam(btn, param) {
+        const barberIdStr = localStorage.getItem('barbergo_session');
+        if (!barberIdStr) return;
+        const barberId = parseInt(barberIdStr.split('_')[1]);
+        const barber = window.db.barbers.find(b => b.id === barberId);
+        if (barber) {
+            if (param === 'homeService') {
+                barber.homeService = !barber.homeService;
+                if (barber.homeService) {
+                    btn.className = 'btn btn-primary';
+                    btn.innerHTML = '<i class="fa-solid fa-toggle-on"></i> متاح';
+                } else {
+                    btn.className = 'btn btn-ghost text-muted';
+                    btn.innerHTML = '<i class="fa-solid fa-toggle-off"></i> غير متاح';
+                }
+            } else if (barber.settings && barber.settings[param] !== undefined) {
+                barber.settings[param] = !barber.settings[param];
+                if (barber.settings[param]) {
+                    btn.className = param === 'enableEmergency' ? 'btn btn-success' : 'btn btn-primary';
+                    btn.innerHTML = '<i class="fa-solid fa-toggle-on"></i> مفعل';
+                } else {
+                    btn.className = 'btn btn-ghost text-muted';
+                    btn.innerHTML = '<i class="fa-solid fa-toggle-off"></i> معطل';
+                }
+            } else if (barber.paymentMethods && barber.paymentMethods[param] !== undefined) {
+                barber.paymentMethods[param] = !barber.paymentMethods[param];
+                if (barber.paymentMethods[param]) {
+                    btn.className = 'btn btn-primary';
+                    btn.innerText = 'مفعل';
+                } else {
+                    btn.className = 'btn btn-ghost text-muted';
+                    btn.innerText = 'معطل';
+                }
+            }
+            window.saveDB();
+        }
+    }
+
+    saveBarberSettings() {
+        const bio = document.getElementById('barber-edit-bio')?.value;
+        const phone = document.getElementById('barber-edit-phone')?.value;
+        const whatsapp = document.getElementById('barber-edit-whatsapp')?.value;
+        const location = document.getElementById('barber-edit-location')?.value;
+        
+        const barberIdStr = localStorage.getItem('barbergo_session');
+        if (!barberIdStr) return;
+        const barberId = parseInt(barberIdStr.split('_')[1]);
+        const barber = window.db.barbers.find(b => b.id === barberId);
+        
+        if (barber) {
+            if (bio) barber.bio = bio;
+            if (phone) barber.phone = phone;
+            if (location) barber.location = location;
+            if (!barber.social) barber.social = {};
+            if (whatsapp) barber.social.whatsapp = whatsapp;
+            
+            window.saveDB();
+            window.notifier.show("تم الحفظ", "تم حفظ إعدادات البروفايل بنجاح، وستظهر للعملاء بشكلها الجديد.", "success");
         }
     }
 
@@ -204,6 +319,21 @@ class App {
                 container.innerHTML += html;
             }
             window.notifier.show("تمت الإضافة", `تمت إضافة خدمة ${name} بقيمة ${price} JOD بنجاح.`, "success");
+        }
+    }
+
+    updateSubscriptionPrice() {
+        const adminData = window.db.adminSettings;
+        const inputs = document.querySelectorAll('#admin-content-3 input[type="number"]');
+        if (inputs.length >= 2) {
+            const monthly = parseInt(inputs[0].value);
+            const yearly = parseInt(inputs[1].value);
+            if (!isNaN(monthly) && !isNaN(yearly)) {
+                adminData.subscriptionPrices.monthly = monthly;
+                adminData.subscriptionPrices.yearly = yearly;
+                window.saveDB();
+                window.notifier.show("تحديث التسعير", "تم حفظ أسعار الاشتراكات الجديدة وتحديثها في قاعدة البيانات.", "success");
+            }
         }
     }
 
@@ -636,13 +766,22 @@ class App {
                         }
                         feed.style.display = 'none';
                         if (flipBtn) flipBtn.style.display = 'none';
+                        
+                        // محاكاة تحليل شكل الوجه واختيار نتيجة
+                        const faceResults = [
+                            { shape: 'وجه دائري (Round)', cut: 'قصة بومبادور (Pompadour)', img: 'https://images.unsplash.com/photo-1622286342621-4bd786c2447c?w=400&q=80' },
+                            { shape: 'وجه طويل (Oval)', cut: 'قصة فرنسية (French Crop)', img: 'https://images.unsplash.com/photo-1593962657416-8360d2b27a3c?w=400&q=80' },
+                            { shape: 'وجه مربّع (Square)', cut: 'قصة Fade مدرج', img: 'https://images.unsplash.com/photo-1605406575497-2e5a707a0ee0?w=400&q=80' }
+                        ];
+                        const randomResult = faceResults[Math.floor(Math.random() * faceResults.length)];
+                        
                         mockResult.style.display = 'block';
-                        mockResult.src = 'https://images.unsplash.com/photo-1599351431202-1e0f0137899a?w=400&q=80';
+                        mockResult.src = randomResult.img;
                         scanLine.style.display = 'none';
 
                         document.getElementById('ai-scan-btn-container').style.display = 'none';
                         document.getElementById('ai-results-actions').style.display = 'block';
-                        window.notifier.show('اكتمل التحليل', 'بناءً على شكل وجهك الحقيقي، هذه هي القصة الأنسب لك!', 'success');
+                        window.notifier.show('اكتمل التحليل', `تم التعرف على: ${randomResult.shape}. القصة الأنسب لك هي: ${randomResult.cut}!`, 'success');
                     }, 5000);
                 })
                 .catch(err => {
