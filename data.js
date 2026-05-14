@@ -31,9 +31,22 @@ const savedData = localStorage.getItem('barbergo_db');
 const db = savedData ? JSON.parse(savedData) : defaultDB;
 
 // Helper function to persist changes globally
-window.saveDB = function () {
+window.saveDB = async function () {
     localStorage.setItem('barbergo_db', JSON.stringify(db));
-    console.log('Database changes saved to LocalStorage');
+    
+    // Simulate Firestore syncing if real keys are not provided yet,
+    // or actually save if useRealFirebase is enabled in firebase-service.js
+    if (window.dbService && window.dbService.useRealFirebase && window.dbService.db) {
+        try {
+            // In a real app we'd break this down into specific documents
+            await window.dbService.db.collection('system').doc('state').set(db);
+            console.log('✅ Database changes successfully synced to Firestore!');
+        } catch (error) {
+            console.error('❌ Error syncing to Firestore (Check your Rules or Config):', error);
+        }
+    } else {
+        console.log('✅ Database changes saved to LocalStorage (Firestore mock active)');
+    }
 };
 
 // Expose to window for global access
