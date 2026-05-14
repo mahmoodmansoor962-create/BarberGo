@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // هذا الإعداد يسمح بالقراءة والكتابة الكاملة على جميع المستندات في قاعدة البيانات
+    // ملاحظة هامة: يجب تغيير هذا الإعداد قبل إطلاق التطبيق الفعلي (Production) لضمان الأمان
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
