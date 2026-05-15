@@ -379,6 +379,41 @@ const UI = {
                         </div>
                         <p class="text-muted m-0" style="font-size: 0.85rem;">استلام تنبيهات قبل الموعد بـ 30 دقيقة</p>
                     </div>
+
+                    <h3 class="text-gold mt-5 mb-4"><i class="fa-solid fa-calendar-check"></i> حجوزاتي القادمة</h3>
+                    <div id="client-bookings-list">
+                        ${(() => {
+                            const clientName = localStorage.getItem('barbergo_client_name');
+                            if (!clientName) return '<p class="text-muted text-center py-3">لا توجد حجوزات حالياً.</p>';
+                            
+                            const myBookings = window.db.bookings.filter(b => b.customer_name === clientName);
+                            if (myBookings.length === 0) return '<p class="text-muted text-center py-3">لا توجد حجوزات حالياً.</p>';
+                            
+                            return myBookings.map(b => {
+                                const bBarber = window.db.barbers.find(barb => barb.id === b.barber_id);
+                                const bService = window.db.services.find(s => s.id === b.service_id);
+                                const bName = bBarber ? bBarber.name : 'حلاق غير معروف';
+                                const sName = bService ? bService.name : 'خدمة غير معروفة';
+                                
+                                return `
+                                <div class="pill-box mb-3 p-3" style="border-right: 3px solid ${b.status === 'cancelled' ? '#e74c3c' : 'var(--gold-primary)'}; background: var(--bg-main);">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h4 class="m-0 text-white">${sName}</h4>
+                                        <div class="text-gold" style="font-weight: bold;">${b.time}</div>
+                                    </div>
+                                    <div class="text-muted mb-3" style="font-size: 0.85rem;"><i class="fa-solid fa-store"></i> ${bName}</div>
+                                    
+                                    ${b.status !== 'cancelled' ? `
+                                        <button class="btn btn-outline w-100 text-danger" style="border-color: #e74c3c; padding: 10px;" onclick="app.cancelClientBooking(${b.id})">
+                                            إلغاء الموعد (مسموح قبل ساعة)
+                                        </button>
+                                    ` : `
+                                        <div class="text-danger text-center" style="font-weight: bold;"><i class="fa-solid fa-circle-xmark"></i> تم الإلغاء</div>
+                                    `}
+                                </div>`;
+                            }).join('');
+                        })()}
+                    </div>
                 </div>
             </div>
             ${this.renderBottomNav('settings')}
@@ -460,12 +495,12 @@ const UI = {
                 <!-- Barber Navigation Tabs -->
                 <div class="tabs-container" style="overflow-x: auto; white-space: nowrap; gap: 15px; border-bottom: none; margin-bottom: 25px; padding-bottom: 10px;">
                     <button class="btn btn-ghost bdash-tab-item active" id="bdash-tab-1" onclick="app.switchBarberDashboardTab(1)">إحصائيات</button>
+                    <button class="btn btn-ghost bdash-tab-item" id="bdash-tab-9" onclick="app.switchBarberDashboardTab(9)">حجوزات العملاء</button>
                     <button class="btn btn-ghost bdash-tab-item" id="bdash-tab-2" onclick="app.switchBarberDashboardTab(2)">ملفي</button>
                     <button class="btn btn-ghost bdash-tab-item" id="bdash-tab-3" onclick="app.switchBarberDashboardTab(3)">الخدمات</button>
                     <button class="btn btn-ghost bdash-tab-item" id="bdash-tab-4" onclick="app.switchBarberDashboardTab(4)">التقويم</button>
                     <button class="btn btn-ghost bdash-tab-item" id="bdash-tab-5" onclick="app.switchBarberDashboardTab(5)">المتجر</button>
                     <button class="btn btn-ghost bdash-tab-item" id="bdash-tab-7" onclick="app.switchBarberDashboardTab(7)">معرض الصور</button>
-                    <button class="btn btn-ghost bdash-tab-item" id="bdash-tab-8" onclick="app.switchBarberDashboardTab(8)">التقييمات</button>
                     <button class="btn btn-ghost bdash-tab-item" id="bdash-tab-8" onclick="app.switchBarberDashboardTab(8)">التقييمات</button>
                 </div>
 
@@ -566,6 +601,34 @@ const UI = {
                                 <span class="text-gold mt-2" style="font-size: 0.7rem; font-weight: bold;">الجمعة</span>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Page 9: Customer Bookings -->
+                <div id="bdash-content-9" class="bdash-content" style="display: none;">
+                    <div class="pill-box text-right mb-4">
+                        <h4 class="text-white mb-3" style="font-size: 1.1rem;"><i class="fa-solid fa-calendar-check text-success"></i> الحجوزات القادمة</h4>
+                        ${(() => {
+                            const bBookings = window.db.bookings.filter(b => b.barber_id === barberId);
+                            const upcoming = bBookings.filter(b => b.status !== 'cancelled');
+                            
+                            if (upcoming.length === 0) return '<p class="text-muted text-center py-3">لا توجد حجوزات قادمة حالياً.</p>';
+                            
+                            return upcoming.map(b => {
+                                const svc = window.db.services.find(s => s.id === b.service_id);
+                                const svcName = svc ? svc.name : 'خدمة غير معروفة';
+                                
+                                return \`
+                                <div class="booking-item mb-3 p-3" style="background: var(--bg-main); border: 1px solid var(--border-color); border-radius: var(--radius-sm); border-right: 3px solid #2ecc71;">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <div class="text-gold" style="font-size: 1.1rem; font-weight: bold;">\${b.customer_name}</div>
+                                        <div class="text-muted" style="font-size: 0.85rem;"><i class="fa-regular fa-clock"></i> \${b.time}</div>
+                                    </div>
+                                    <div class="text-white mb-3" style="font-size: 0.9rem;"><i class="fa-solid fa-scissors text-muted"></i> \${svcName}</div>
+                                    <button class="btn w-100 mt-2 text-danger" style="background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.3); font-weight: bold; padding: 10px;" onclick="app.cancelBooking(this, '\${b.customer_name}')">إلغاء الحجز وإرسال تنبيه للعميل</button>
+                                </div>\`;
+                            }).join('');
+                        })()}
                     </div>
                 </div>
 
@@ -745,28 +808,7 @@ const UI = {
                         <button class="btn btn-primary w-100 mt-4" style="padding: 12px; font-size: 1rem;" onclick="window.notifier.show('تم الحفظ', 'تم حفظ أوقات العمل والعطل بنجاح', 'success')">حفظ الأوقات المدخلة</button>
                     </div>
 
-                    <!-- Existing Bookings -->
-                    <div class="pill-box text-right mb-4">
-                        <h4 class="text-white mb-3" style="font-size: 1.1rem;"><i class="fa-solid fa-calendar-check text-success"></i> الحجوزات القادمة</h4>
-                        
-                        <div class="booking-item mb-3 p-3" style="background: var(--bg-main); border: 1px solid var(--border-color); border-radius: var(--radius-sm); border-right: 3px solid #2ecc71;">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <div class="text-gold" style="font-size: 1.1rem; font-weight: bold;">أحمد محمد</div>
-                                <div class="text-muted" style="font-size: 0.85rem;"><i class="fa-regular fa-clock"></i> اليوم, 04:30 م</div>
-                            </div>
-                            <div class="text-white mb-3" style="font-size: 0.9rem;"><i class="fa-solid fa-scissors text-muted"></i> قصة شعر مودرن مع سشوار</div>
-                            <button class="btn w-100 mt-2 text-danger" style="background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.3); font-weight: bold; padding: 10px;" onclick="app.cancelBooking(this, 'أحمد محمد')">إلغاء الحجز وإرسال تنبيه للعميل</button>
-                        </div>
-                        
-                        <div class="booking-item p-3" style="background: var(--bg-main); border: 1px solid var(--border-color); border-radius: var(--radius-sm); border-right: 3px solid #2ecc71;">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <div class="text-gold" style="font-size: 1.1rem; font-weight: bold;">خالد عبد الله</div>
-                                <div class="text-muted" style="font-size: 0.85rem;"><i class="fa-regular fa-clock"></i> اليوم, 06:00 م</div>
-                            </div>
-                            <div class="text-white mb-3" style="font-size: 0.9rem;"><i class="fa-solid fa-scissors text-muted"></i> تنظيف بشرة كامل</div>
-                            <button class="btn w-100 mt-2 text-danger" style="background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.3); font-weight: bold; padding: 10px;" onclick="app.cancelBooking(this, 'خالد عبد الله')">إلغاء الحجز وإرسال تنبيه للعميل</button>
-                        </div>
-                    </div>
+
 
                     <!-- Block Out Settings -->
                     <div class="pill-box text-right">
