@@ -310,22 +310,46 @@ class App {
     }
 
     simulateAddService() {
+        const barberIdStr = localStorage.getItem('barbergo_session');
+        if (!barberIdStr || !barberIdStr.startsWith('barber_')) return;
+        const barberId = parseInt(barberIdStr.split('_')[1]);
+
         const name = prompt("أدخل اسم الخدمة الجديدة:");
         const price = prompt("أدخل سعر الخدمة (بالدينار):");
         if (name && price) {
+            const newSvc = {
+                id: Date.now(),
+                barber_id: barberId,
+                name: name,
+                price: parseFloat(price),
+                duration: 30
+            };
+            window.db.services.push(newSvc);
+            window.saveDB();
+
             const container = document.getElementById('services-list-container');
             if (container) {
                 const html = `
-                <div class="pill-box p-3 mb-2 d-flex justify-content-between align-items-center" style="border-left: 3px solid var(--gold-primary);">
+                <div class="pill-box p-3 mb-2 d-flex justify-content-between align-items-center" style="border-left: 3px solid var(--gold-primary);" id="svc-${newSvc.id}">
                     <div class="text-right">
                         <h4 class="m-0 text-white">${name}</h4>
                         <div class="text-muted" style="font-size: 0.85rem; margin-top: 5px;"><i class="fa-regular fa-clock"></i> 30 دقيقة | <i class="fa-solid fa-tag"></i> JOD ${price}</div>
                     </div>
-                    <button class="btn btn-ghost text-danger p-2" onclick="this.parentElement.remove()"><i class="fa-solid fa-trash"></i></button>
+                    <button class="btn btn-ghost text-danger p-2" onclick="app.deleteService(${newSvc.id}, this)"><i class="fa-solid fa-trash"></i></button>
                 </div>`;
                 container.innerHTML += html;
             }
-            window.notifier.show("تمت الإضافة", `تمت إضافة خدمة ${name} بقيمة ${price} JOD بنجاح.`, "success");
+            window.notifier.show("تمت الإضافة", `تمت إضافة خدمة ${name} بقيمة ${price} JOD بنجاح. ستظهر الآن للعملاء.`, "success");
+        }
+    }
+
+    deleteService(serviceId, btnEl) {
+        const confirmDel = confirm("هل أنت متأكد من حذف هذه الخدمة؟");
+        if (confirmDel) {
+            window.db.services = window.db.services.filter(s => s.id !== serviceId);
+            window.saveDB();
+            if (btnEl) btnEl.closest('.pill-box').remove();
+            window.notifier.show("حذف الخدمة", "تم حذف الخدمة بنجاح.", "info");
         }
     }
 
@@ -468,14 +492,57 @@ class App {
     }
 
     cancelBookingAlert(bookingIdElement) {
+        // legacy method, kept for reference
         const reason = prompt("إلغاء حجز! تنويه: سيتم حفظ الإلغاء. الرجاء كتابة سبب الإلغاء للعميل:");
         if (reason) {
-            // Find booking and update status
-            const currentBookingRow = bookingIdElement.closest('.client-request-card'); // assuming it's a card
-            // We just update the DOM and pretend server sync for this barber dashboard view
             window.notifier.show("تم الإلغاء", `تم إلغاء الحجز للعميل بالسبب: ${reason}`, "info");
-        } else if (reason === "") {
-            window.notifier.show("تنبيه", "الإلغاء لم يتم، يجب كتابة سبب لكي يتم إرساله للعميل.", "warning");
+        }
+    }
+
+    cancelBooking(btn, clientName) {
+        const isCancelled = btn.classList.contains('btn-warning');
+        
+        if (!isCancelled) {
+            // Cancel booking
+            const reason = prompt(`الرجاء كتابة سبب إلغاء حجز (${clientName}) لإرساله للعميل:`);
+            if (reason !== null) { // User didn't click Cancel on prompt
+                const bookingCard = btn.closest('.booking-item');
+                if (bookingCard) {
+                    bookingCard.style.opacity = '0.6';
+                    bookingCard.style.borderRightColor = '#e74c3c'; // change green line to red
+                }
+                
+                btn.classList.remove('btn-danger', 'text-danger');
+                btn.classList.add('btn-warning', 'text-dark');
+                btn.style.background = 'rgba(243, 156, 18, 0.2)';
+                btn.style.border = '1px solid rgba(243, 156, 18, 0.4)';
+                btn.innerHTML = '<i class="fa-solid fa-rotate-left"></i> تراجع عن الإلغاء';
+                
+                // Show simulated notification to client
+                const barberName = window.db.barbers.find(b => b.id === parseInt(localStorage.getItem('barbergo_session').split('_')[1]))?.name || "الحلاق";
+                window.notifier.show("تم إرسال الاعتذار للعميل", `نعتذر منك بشدة.. نود إعلامك بأن موعدك لدى ${barberName} قد تم إلغاؤه لظرف طارئ خارج عن إرادتنا. نحن نهتم بوقتك، بإمكانك إعادة الحجز في وقت آخر يناسبك. شكراً لتفهمك - فريق BarberGo.`, "info");
+                
+                // In real app, we'd find the booking ID and set status = 'cancelled' and saveDB()
+                // window.saveDB();
+            }
+        } else {
+            // Undo Cancel
+            const bookingCard = btn.closest('.booking-item');
+            if (bookingCard) {
+                bookingCard.style.opacity = '1';
+                bookingCard.style.borderRightColor = '#2ecc71'; // revert to green
+            }
+            
+            btn.classList.remove('btn-warning', 'text-dark');
+            btn.classList.add('btn-danger', 'text-danger');
+            btn.style.background = 'rgba(231, 76, 60, 0.1)';
+            btn.style.border = '1px solid rgba(231, 76, 60, 0.3)';
+            btn.innerHTML = 'إلغاء الحجز وإرسال تنبيه للعميل';
+            
+            window.notifier.show("تم استعادة الحجز", `تم استعادة حجز العميل (${clientName}) بنجاح. تم إعلامه بتأكيد الموعد.`, "success");
+            
+            // In real app, we'd find the booking ID and set status = 'active' and saveDB()
+            // window.saveDB();
         }
     }
 
@@ -491,6 +558,12 @@ class App {
             booking.status = 'cancelled';
             window.saveDB();
             window.notifier.show("تأكيد الإلغاء", "تم إلغاء الموعد بنجاح. نعتذر لسماع ذلك ونأمل رؤيتك قريباً.", "success");
+            
+            // محاكاة إشعار للعملاء المهتمين والحلاق بتوفر الوقت
+            setTimeout(() => {
+                window.notifier.show("إشعار توفر وقت 🔔", `لقد أصبح الوقت (${booking.time}) متاحاً الآن للحجز!`, "info");
+            }, 2000);
+
             this.navigate('clientBookings');
         }
     }
@@ -517,10 +590,13 @@ class App {
 
         const timeStr = selectedSlot.innerText;
 
+        const bId = this.currentParams.barberId || this.currentParams.id;
         await window.dbService.bookAppointment({
             customer_name: name,
             time: timeStr,
-            date: new Date().toISOString()
+            date: new Date().toISOString(),
+            barber_id: bId,
+            service_id: this.currentParams.serviceId
         });
 
         // Identify client for future sessions (My Bookings page)
