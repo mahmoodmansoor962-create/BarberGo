@@ -1214,6 +1214,9 @@ class App {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    window.app = new App();
+// تشغيل محرك التطبيق فعلياً عند تحميل الصفحة
+window.addEventListener('DOMContentLoaded', () => {
+    if (!window.app) {
+        window.app = new App();
+    }
 });
