@@ -6,6 +6,7 @@ class DatabaseService {
         this.useRealFirebase = false;
         this.db = null;
         this.auth = null;
+        this.mockListeners = new Map(); // barberId => Map(listenerId => callback)
 
         if (this.useRealFirebase && window.firebase) {
             const firebaseConfig = {
@@ -38,9 +39,8 @@ class DatabaseService {
                     callback(changes);
                 });
         } else {
-            // Mock Socket Subscription logic
-            this._mockAddBookingListener(barberId, callback);
-            return () => console.log("Unsubscribed from mock");
+            // Mock Socket Subscription logic (per-subscriber, with unsubscribe)
+            return this._mockAddBookingListener(barberId, callback);
         }
     }
 
@@ -63,10 +63,19 @@ class DatabaseService {
                         if (window.saveDB) window.saveDB();
                     }
 
-                    // Trigger mock listener
-                    if (this.mockListener) {
-                        this.mockListener([{ type: 'added', data: newBooking }]);
+                    // Trigger mock listeners for this barberId (if any)
+                    try {
+                        const barberListeners = this.mockListeners.get(newBooking.barber_id);
+                        if (barberListeners && barberListeners.size > 0) {
+                            const changes = [{ type: 'added', data: newBooking }];
+                            barberListeners.forEach(cb => {
+                                try { cb(changes); } catch (err) { console.error('mock listener error', err); }
+                            });
+                        }
+                    } catch (err) {
+                        console.error('Error delivering mock listeners:', err);
                     }
+
                     resolve(newBooking);
                 }, 500);
             });
@@ -77,7 +86,24 @@ class DatabaseService {
     // Mock WebSocket Utilities (For Development)
     // ============================================
     _mockAddBookingListener(barberId, callback) {
-        this.mockListener = callback;
+        // Ensure map for this barberId
+        if (!this.mockListeners.has(barberId)) {
+            this.mockListeners.set(barberId, new Map());
+        }
+        const listenersMap = this.mockListeners.get(barberId);
+        const listenerId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+        listenersMap.set(listenerId, callback);
+
+        // Return unsubscribe function
+        const unsubscribe = () => {
+            const map = this.mockListeners.get(barberId);
+            if (map) {
+                map.delete(listenerId);
+                if (map.size === 0) this.mockListeners.delete(barberId);
+            }
+        };
+
+        return unsubscribe;
     }
 }
 
