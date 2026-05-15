@@ -1284,7 +1284,6 @@ const UI = {
                 </div>
             </div>
         `;
-    }
 };
 
 window.UI = UI;
