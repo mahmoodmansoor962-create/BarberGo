@@ -2,9 +2,7 @@
 
 const UI = {
     renderTopHeader(title = 'BarberGo') {
-        // فحص حقيقي للحالة: إذا المحرك لم يجهز بعد، نستخدم اللغة الافتراضية بدلاً من تعطيل الموقع
-        const isEn = (typeof window.app !== 'undefined' && window.app.language === 'en');
-        const langText = isEn ? 'عربي' : 'English';
+        const langText = window.app && window.app.language === 'en' ? 'عربي' : 'English';
         return `
             <header class="top-header">
                 <div class="container">
@@ -1273,7 +1271,7 @@ const UI = {
 
             </div>
             
-          <div class="bottom-nav-container">
+            <div class="bottom-nav-container">
                 <div class="bottom-nav">
                     <div class="nav-item cursor-pointer" onclick="app.navigate('welcome')">
                         <i class="fa-solid fa-right-from-bracket text-danger"></i>
@@ -1286,6 +1284,7 @@ const UI = {
                 </div>
             </div>
         `;
+    }
 };
 
 window.UI = UI;
