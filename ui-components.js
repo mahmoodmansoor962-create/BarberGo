@@ -274,7 +274,7 @@ const UI = {
                                 const allSlots = ['10:00 ص','10:30 ص','11:00 ص','11:30 ص','12:00 م','12:30 م','01:00 م','01:30 م','02:00 م','02:30 م','03:00 م','03:30 م','04:00 م','04:30 م','05:00 م','05:30 م','06:00 م','06:30 م','07:00 م','07:30 م','08:00 م','08:30 م','09:00 م','09:30 م','10:00 م'];
                                 const barber = window.db.barbers.find(b => b.id === barberId);
                                 const blockedTimes = barber.blockedTimes || [];
-                                const bookedTimes = window.db.bookings.filter(b => b.barber_id === barberId).map(b => b.time);
+                                const bookedTimes = window.db.bookings.filter(b => b.barber_id === barberId && b.status !== 'cancelled').map(b => b.time);
                                 
                                 return allSlots.map(time => {
                                     if (blockedTimes.includes(time) || bookedTimes.includes(time)) {
