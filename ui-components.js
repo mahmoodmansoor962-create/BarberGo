@@ -492,7 +492,11 @@ const UI = {
                                 svcCounts[b.service_id] = (svcCounts[b.service_id] || 0) + 1;
                             });
                             let topSvcId = Object.keys(svcCounts).sort((a,b) => svcCounts[b] - svcCounts[a])[0];
-                            const topSvcName = topSvcId ? (db.services.find(s => s.id == topSvcId)?.name || 'لا يوجد') : 'لا يوجد';
+                            let topSvcName = 'لا يوجد';
+                            if (topSvcId) {
+                                const svc = db.services.find(s => s.id == topSvcId);
+                                if (svc && svc.name) topSvcName = svc.name;
+                            }
                             
                             const cancelRate = bBookings.length ? Math.round((bBookings.filter(b => b.status === 'cancelled').length / bBookings.length) * 100) : 0;
 
