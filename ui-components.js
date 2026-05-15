@@ -618,7 +618,7 @@ const UI = {
                                 const svc = window.db.services.find(s => s.id === b.service_id);
                                 const svcName = svc ? svc.name : 'خدمة غير معروفة';
                                 
-                                return \`
+                                return `
                                 <div class="booking-item mb-3 p-3" style="background: var(--bg-main); border: 1px solid var(--border-color); border-radius: var(--radius-sm); border-right: 3px solid #2ecc71;">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
                                         <div class="text-gold" style="font-size: 1.1rem; font-weight: bold;">\${b.customer_name}</div>
@@ -626,7 +626,7 @@ const UI = {
                                     </div>
                                     <div class="text-white mb-3" style="font-size: 0.9rem;"><i class="fa-solid fa-scissors text-muted"></i> \${svcName}</div>
                                     <button class="btn w-100 mt-2 text-danger" style="background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.3); font-weight: bold; padding: 10px;" onclick="app.cancelBooking(this, '\${b.customer_name}')">إلغاء الحجز وإرسال تنبيه للعميل</button>
-                                </div>\`;
+                                </div>`;
                             }).join('');
                         })()}
                     </div>
