@@ -1271,7 +1271,7 @@ const UI = {
 
             </div>
             
-            <div class="bottom-nav-container">
+          <div class="bottom-nav-container">
                 <div class="bottom-nav">
                     <div class="nav-item cursor-pointer" onclick="app.navigate('welcome')">
                         <i class="fa-solid fa-right-from-bracket text-danger"></i>
@@ -1284,6 +1284,7 @@ const UI = {
                 </div>
             </div>
         `;
-    };
+    }
+};
 
 window.UI = UI;
