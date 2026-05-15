@@ -2,7 +2,9 @@
 
 const UI = {
     renderTopHeader(title = 'BarberGo') {
-        const langText = window.app && window.app.language === 'en' ? 'عربي' : 'English';
+        // فحص حقيقي للحالة: إذا المحرك لم يجهز بعد، نستخدم اللغة الافتراضية بدلاً من تعطيل الموقع
+        const isEn = (typeof window.app !== 'undefined' && window.app.language === 'en');
+        const langText = isEn ? 'عربي' : 'English';
         return `
             <header class="top-header">
                 <div class="container">
