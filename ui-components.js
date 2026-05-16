@@ -667,7 +667,7 @@ const UI = {
                                         <div class="text-muted" style="font-size: 0.85rem;"><i class="fa-regular fa-clock"></i> \${b.time}</div>
                                     </div>
                                     <div class="text-white mb-3" style="font-size: 0.9rem;"><i class="fa-solid fa-scissors text-muted"></i> \${svcName}</div>
-                                    \${b.preOrderProducts && b.preOrderProducts.length ? `<div class="text-gold mb-2" style="font-size: 0.95rem; font-weight:600;">المنتجات المطلوب تحضيرها: ${b.preOrderProducts.map(p => p.productName).join(', ')}</div>` : ''}
+                                    \${b.preOrderProducts && b.preOrderProducts.length ? '<div class="text-gold mb-2" style="font-size: 0.95rem; font-weight:600;">المنتجات المطلوب تحضيرها: ' + (b.preOrderProducts.map(function(p){ return p.productName; }).join(', ')) + '</div>' : ''}
                                     <button class="btn w-100 mt-2 text-danger" style="background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.3); font-weight: bold; padding: 10px;" onclick="app.cancelBooking(this, '\${b.customer_name}')">إلغاء الحجز وإرسال تنبيه للعميل</button>
                                 </div>`;
                             }).join('');
