@@ -5,6 +5,7 @@ const defaultDB = {
     services: [],
     products: [],
     bookings: [],
+    notifications: [],
     supportTickets: [],
     adminSettings: {
         platformRevenue: 0,
@@ -48,6 +49,17 @@ window.saveDB = async function () {
         console.log('✅ Database changes saved to LocalStorage (Firestore mock active)');
     }
 };
+
+// Ensure the global DB object always has required arrays
+window.db = window.db || db;
+window.db.users = window.db.users || [];
+window.db.barbers = window.db.barbers || [];
+window.db.services = window.db.services || [];
+window.db.products = window.db.products || [];
+window.db.bookings = window.db.bookings || [];
+window.db.notifications = window.db.notifications || [];
+window.db.supportTickets = window.db.supportTickets || [];
+window.db.adminSettings = window.db.adminSettings || defaultDB.adminSettings;
 
 // Expose to window for global access
 window.db = db;

@@ -8,7 +8,7 @@ const UI = {
                 <div class="container">
                     <div class="header-actions">
                         <button class="lang-btn" onclick="app.toggleLanguage()"><i class="fa-solid fa-globe"></i> ${langText}</button>
-                        <button class="bell-btn" onclick="app.simulateNotification()">
+                        <button class="bell-btn" onclick="app.openNotifications()">
                             <i class="fa-regular fa-bell"></i>
                             <span class="bell-dot"></span>
                         </button>
@@ -81,7 +81,7 @@ const UI = {
                 <div class="container py-4">
                     <div class="search-bar mb-4 d-flex align-items-center p-1" style="background: var(--bg-card); border: 2px solid var(--gold-primary); border-radius: var(--radius-lg); box-shadow: var(--shadow-gold);">
                         <button class="location-btn btn btn-ghost" style="border-radius: 50%; padding: 10px;" onclick="app.requestLocation()"><i class="fa-solid fa-location-dot"></i></button>
-                        <input type="text" id="client-search-input" class="form-control" style="background: transparent; border: none; flex: 1; padding: 10px; color: #fff; text-align: right; outline: none; font-size: 1rem;" placeholder="${window.i18n[app.language].searchPlaceholder}" onkeyup="app.filterBarbers()">
+                        <input type="text" id="client-search-input" class="form-control" style="background: transparent; border: none; flex: 1; padding: 10px; color: #fff; text-align: right; outline: none; font-size: 1rem;" placeholder="${window.i18n[app.language].searchPlaceholder}" onkeyup="app.debouncedFilterBarbers()">
                         <button class="voice-btn btn btn-primary" style="border-radius: 50%; width: 50px; height: 50px; padding: 0;" onclick="app.startVoiceSearch(this)"><i class="fa-solid fa-microphone"></i></button>
                     </div>
                     <h3 class="mb-3 text-right">${window.i18n[app.language].suggestedBarbers}</h3>
@@ -420,6 +420,47 @@ const UI = {
         `;
     },
 
+    renderClientNotifications() {
+        const customerName = localStorage.getItem('barbergo_client_name');
+        const notifications = (window.db.notifications || []).filter(n => n.customerName === customerName && !n.archived).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        const notificationsHtml = notifications.length ? notifications.map(n => `
+            <div class="pill-box mb-4 p-4" style="border: 1px solid var(--gold-primary); background: var(--bg-main);">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <h3 class="text-gold mb-2">إشعار تقييم الخدمة</h3>
+                        <p class="text-white mb-0" style="font-size: 0.95rem; line-height: 1.7;">${n.message}</p>
+                    </div>
+                    <span class="text-muted" style="font-size: 0.75rem;">${new Date(n.createdAt).toLocaleString('ar-EG')}</span>
+                </div>
+                <div class="form-group text-right mb-3">
+                    <div class="text-white mb-2" style="font-size: 0.9rem;">قيم تجربتك الآن: <span id="feedback-value-${n.id}" class="text-gold">80%</span></div>
+                    <input type="range" id="feedback-slider-${n.id}" min="0" max="100" value="80" oninput="document.getElementById('feedback-value-${n.id}').innerText = this.value + '%';" style="width: 100%; accent-color: var(--gold-primary); background: transparent;">
+                </div>
+                <div class="d-flex flex-column gap-2" style="margin-top: 15px;">
+                    <button class="btn btn-primary w-100" onclick="app.submitFeedback(${n.barberId}, ${n.id})">إرسال التقييم لكابتن ${n.barberName}</button>
+                    <button class="btn btn-ghost w-100 text-gold" onclick="app.archiveNotification(${n.id})">إغلاق</button>
+                </div>
+            </div>
+        `).join('') : `
+            <div class="pill-box p-4 text-center" style="background: var(--bg-main); border: 1px solid var(--border-color);">
+                <p class="text-muted mb-0" style="font-size: 0.95rem; line-height: 1.7;">${customerName ? 'لا توجد إشعارات جديدة حالياً. ستظهر إشعار التقييم هنا بعد انتهاء موعدك بساعة واحدة.' : 'لم يتم تسجيل اسم العميل بعد. يرجى حجز موعد أولاً لتلقي إشعارات التقييم.'}</p>
+            </div>
+        `;
+
+        return `
+            ${this.renderTopHeader('قائمة الإشعارات')}
+            <div class="page container py-4" style="padding-bottom: 100px;">
+                <div class="pill-box text-right mb-4" style="border: 1px solid var(--gold-primary);">
+                    <h3 class="text-gold mb-2"><i class="fa-solid fa-bell"></i> قائمة الإشعارات</h3>
+                    <p class="text-muted mb-0" style="font-size: 0.9rem; line-height: 1.6;">هنا سيتم عرض طلب تقييم بعد ساعة من انتهاء موعدك، بالإضافة إلى زر الإرسال أو الإغلاق اختياري.</p>
+                </div>
+                ${notificationsHtml}
+            </div>
+            ${this.renderBottomNav('home')}
+        `;
+    },
+
     renderWelcome() {
         return `
             <div class="welcome-container page text-center container" style="display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh;">
@@ -502,6 +543,7 @@ const UI = {
                     <button class="btn btn-ghost bdash-tab-item" id="bdash-tab-5" onclick="app.switchBarberDashboardTab(5)">المتجر</button>
                     <button class="btn btn-ghost bdash-tab-item" id="bdash-tab-7" onclick="app.switchBarberDashboardTab(7)">معرض الصور</button>
                     <button class="btn btn-ghost bdash-tab-item" id="bdash-tab-8" onclick="app.switchBarberDashboardTab(8)">التقييمات</button>
+                    <button class="btn btn-ghost bdash-tab-item" id="bdash-tab-10" onclick="app.switchBarberDashboardTab(10)">تقييم العملاء</button>
                 </div>
 
                 <!-- Page 1: Analytics -->
@@ -911,6 +953,29 @@ const UI = {
                         </div>
                     </div>
                 </div>
+
+                <div id="bdash-content-10" class="bdash-content" style="display: none;">
+                    <div class="pill-box text-right mb-4 border-gold">
+                        <h4 class="text-gold mb-3"><i class="fa-solid fa-comment-dots"></i> تقييم العملاء</h4>
+                        <p class="text-muted mb-3" style="font-size: 0.9rem; line-height: 1.6;">سجل التقييمات التي أرسلها العملاء بعد إكمال حجوزاتهم. يظهر هنا اسم العميل والنسبة المئوية للتقييم.</p>
+                        ${(() => {
+                            const ratings = barber.ratings || [];
+                            if (ratings.length === 0) {
+                                return '<div class="text-muted text-center p-4" style="font-size: 0.95rem;">لا توجد تقييمات العملاء بعد. سيتم عرض التقييمات هنا فور إرسال العملاء لملاحظاتهم.</div>';
+                            }
+                            return ratings.map(r => `
+                                <div class="pill-box mb-3 p-3" style="border: 1px solid var(--border-color); background: var(--bg-main);">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <div class="text-white" style="font-weight: bold;">${r.customerName}</div>
+                                        <div class="text-gold" style="font-weight: bold;">${r.ratingPercentage}%</div>
+                                    </div>
+                                    <div class="text-muted" style="font-size: 0.85rem;">${new Date(r.timestamp).toLocaleString('ar-EG')}</div>
+                                </div>
+                            `).join('');
+                        })()}
+                    </div>
+                </div>
+
                 <!-- Payment was moved to Profile page -->
 
             </div>

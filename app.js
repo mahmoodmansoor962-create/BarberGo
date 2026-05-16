@@ -45,6 +45,10 @@ class App {
         this.currentParams = {};
         this.language = localStorage.getItem('barbergo_lang') || 'ar'; // Real persistence
         document.documentElement.dir = this.language === 'ar' ? 'rtl' : 'ltr';
+        this.debouncedFilterBarbers = this.debounce(this.filterBarbers.bind(this), 120);
+        if (window.dbService && typeof window.dbService.initFeedbackScheduler === 'function') {
+            window.dbService.initFeedbackScheduler();
+        }
         this.init();
     }
 
@@ -107,6 +111,9 @@ class App {
             case 'clientSettings':
                 html = UI.renderClientSettings();
                 break;
+            case 'clientNotifications':
+                html = UI.renderClientNotifications();
+                break;
             case 'clientBookings':
                 html = UI.renderClientBookings();
                 break;
@@ -157,21 +164,82 @@ class App {
         this.navigate(this.currentView, this.currentParams);
     }
 
+    debounce(fn, wait = 120) {
+        let timeout;
+        return (...args) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = setTimeout(() => fn(...args), wait);
+        };
+    }
+
+    throttle(fn, limit = 100) {
+        let waiting = false;
+        return (...args) => {
+            if (!waiting) {
+                fn(...args);
+                waiting = true;
+                setTimeout(() => waiting = false, limit);
+            }
+        };
+    }
+
     filterBarbers() {
         const query = document.getElementById('client-search-input').value.toLowerCase();
         const barberCards = document.querySelectorAll('.barber-grid-card');
-        barberCards.forEach(card => {
-            const name = card.querySelector('h3').innerText.toLowerCase();
-            if (name.includes(query)) {
-                card.style.display = 'block';
-            } else {
-                card.style.display = 'none';
-            }
+        window.requestAnimationFrame(() => {
+            barberCards.forEach(card => {
+                const name = card.querySelector('h3').innerText.toLowerCase();
+                card.style.display = name.includes(query) ? 'block' : 'none';
+            });
         });
     }
 
     requestLocation() {
         window.notifier.show("تحديد الموقع", "تم تحديد موقعك الجغرافي بنجاح. يتم الآن عرض أقرب الحلاقين إليك.", "success");
+    }
+
+    openNotifications() {
+        this.navigate('clientNotifications');
+        const customerName = localStorage.getItem('barbergo_client_name');
+        if (!customerName) {
+            window.notifier.show("تنبيه", "لم يتم العثور على اسم العميل. قم بالحجز أولاً لتلقي إشعارات التقييم.", "info");
+        }
+    }
+
+    submitFeedback(barberId, notificationId) {
+        const slider = document.getElementById(`feedback-slider-${notificationId}`);
+        const value = slider ? parseInt(slider.value, 10) : 0;
+        const notification = window.db.notifications.find(n => n.id === notificationId);
+        if (!notification) return;
+
+        const ratingData = {
+            customerName: notification.customerName || localStorage.getItem('barbergo_client_name') || 'العميل',
+            ratingPercentage: value,
+            timestamp: new Date().toISOString()
+        };
+
+        if (window.dbService && typeof window.dbService.addBarberRating === 'function') {
+            window.dbService.addBarberRating(barberId, ratingData);
+        }
+
+        notification.archived = true;
+        notification.submitted = true;
+        notification.ratingPercentage = value;
+        notification.submittedAt = new Date().toISOString();
+        window.saveDB();
+
+        window.notifier.show("تم الإرسال", `تم إرسال تقييمك لكابتن ${notification.barberName} بنجاح. شكراً لمشاركتك رأيك.`, "success");
+        this.navigate('clientNotifications');
+    }
+
+    archiveNotification(notificationId) {
+        const notification = window.db.notifications.find(n => n.id === notificationId);
+        if (!notification) return;
+
+        notification.archived = true;
+        window.saveDB();
+        window.notifier.show("تم الإغلاق", "تم إغلاق الإشعار ولن يتم عرضه مجدداً.", "info");
+        this.navigate('clientNotifications');
     }
 
     toggleFavorite(id) {
