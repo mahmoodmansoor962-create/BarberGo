@@ -46,6 +46,7 @@ class App {
         this.language = localStorage.getItem('barbergo_lang') || 'ar'; // Real persistence
         document.documentElement.dir = this.language === 'ar' ? 'rtl' : 'ltr';
         this.debouncedFilterBarbers = this.debounce(this.filterBarbers.bind(this), 120);
+        this.pendingPreOrderProducts = [];
         if (window.dbService && typeof window.dbService.initFeedbackScheduler === 'function') {
             window.dbService.initFeedbackScheduler();
         }
@@ -414,10 +415,98 @@ class App {
     deleteService(serviceId, btnEl) {
         const confirmDel = confirm("هل أنت متأكد من حذف هذه الخدمة؟");
         if (confirmDel) {
-            window.db.services = window.db.services.filter(s => s.id !== serviceId);
-            window.saveDB();
-            if (btnEl) btnEl.closest('.pill-box').remove();
-            window.notifier.show("حذف الخدمة", "تم حذف الخدمة بنجاح.", "info");
+            // Prefer real backend if available
+            if (window.dbService && typeof window.dbService.deleteService === 'function') {
+                window.dbService.deleteService(serviceId).then(() => {
+                    window.db.services = window.db.services.filter(s => s.id !== serviceId);
+                    window.saveDB && window.saveDB();
+                    if (btnEl) btnEl.closest('.pill-box').remove();
+                    window.notifier.show("حذف الخدمة", "تم حذف الخدمة بنجاح.", "info");
+                }).catch(err => {
+                    console.error(err);
+                    window.notifier.show("خطأ", "فشل حذف الخدمة. حاول مجدداً.", "error");
+                });
+            } else {
+                window.db.services = window.db.services.filter(s => s.id !== serviceId);
+                window.saveDB && window.saveDB();
+                if (btnEl) btnEl.closest('.pill-box').remove();
+                window.notifier.show("حذف الخدمة", "تم حذف الخدمة بنجاح.", "info");
+            }
+        }
+    }
+
+    // Confirm delete used by barber UI buttons
+    confirmDeleteService(serviceId, btnEl) {
+        const ok = confirm('هل أنت متأكد من حذف هذه الخدمة نهائياً؟');
+        if (!ok) return;
+        this.deleteService(serviceId, btnEl);
+    }
+
+    startEditService(serviceId, btnEl) {
+        const svc = window.db.services.find(s => s.id === serviceId);
+        if (!svc) return;
+        const container = document.getElementById('svc-' + serviceId);
+        if (!container) return;
+
+        container.innerHTML = `
+            <div style="flex:1; text-align: right;">
+                <input id="edit-name-${serviceId}" class="form-control" style="background: var(--bg-main); border: 1px solid var(--border-color); color: #fff; padding: 8px; width: 100%; margin-bottom:6px;" value="${svc.name}">
+                <input id="edit-price-${serviceId}" class="form-control" style="background: var(--bg-main); border: 1px solid var(--border-color); color: #fff; padding: 8px; width: 140px;" value="${svc.price}">
+            </div>
+            <div style="display:flex; gap:6px; align-items:center;">
+                <button class="btn btn-primary p-2" onclick="app.saveServiceEdit(${serviceId}, this)">حفظ</button>
+                <button class="btn btn-ghost p-2" onclick="app.navigate('barberDashboard', { id: ${svc.barber_id} })">إلغاء</button>
+            </div>
+        `;
+    }
+
+    async saveServiceEdit(serviceId) {
+        const nameEl = document.getElementById('edit-name-' + serviceId);
+        const priceEl = document.getElementById('edit-price-' + serviceId);
+        if (!nameEl || !priceEl) return;
+        const newName = nameEl.value.trim();
+        const newPrice = parseFloat(priceEl.value);
+        if (!newName || isNaN(newPrice)) {
+            window.notifier.show('خطأ', 'يرجى إدخال اسم صحيح وسعر رقمي.', 'error');
+            return;
+        }
+
+        // Optimistically update local DB for snappy UI
+        const svc = window.db.services.find(s => s.id === serviceId);
+        if (svc) {
+            svc.name = newName;
+            svc.price = newPrice;
+            window.saveDB && window.saveDB();
+        }
+
+        try {
+            if (window.dbService && typeof window.dbService.updateService === 'function') {
+                await window.dbService.updateService(serviceId, { name: newName, price: newPrice });
+            }
+            window.notifier.show('تم الحفظ', 'تم تحديث بيانات الخدمة بنجاح.', 'success');
+            // Refresh view to show updated service
+            this.navigate('barberDashboard', { id: svc.barber_id });
+        } catch (err) {
+            console.error(err);
+            window.notifier.show('خطأ', 'فشل تحديث الخدمة. حاول مجدداً.', 'error');
+        }
+    }
+
+    // Product pre-order toggling on client product cards
+    togglePreOrderProduct(productId, btnEl) {
+        const prod = window.db.products.find(p => p.id === productId);
+        if (!prod) return;
+
+        const idx = this.pendingPreOrderProducts.findIndex(p => p.productId === productId);
+        if (idx > -1) {
+            // remove
+            this.pendingPreOrderProducts.splice(idx, 1);
+            if (btnEl) btnEl.innerText = 'إضافه للطلب والتحضير';
+            window.notifier.show('تمت الإزالة', `${prod.name} تمت إزالته من قائمة التحضير.`, 'info');
+        } else {
+            this.pendingPreOrderProducts.push({ productId: productId, productName: prod.name, quantity: 1 });
+            if (btnEl) btnEl.innerText = 'تمت الإضافة';
+            window.notifier.show('تمت الإضافة', `${prod.name} أضيف لطلب التحضير عند الحضور.`, 'success');
         }
     }
 
@@ -659,13 +748,18 @@ class App {
         const timeStr = selectedSlot.innerText;
 
         const bId = this.currentParams.barberId || this.currentParams.id;
+        const preOrders = (this.pendingPreOrderProducts || []).map(p => ({ productName: p.productName, quantity: p.quantity || 1 }));
         await window.dbService.bookAppointment({
             customer_name: name,
             time: timeStr,
             date: new Date().toISOString(),
             barber_id: bId,
-            service_id: this.currentParams.serviceId
+            service_id: this.currentParams.serviceId,
+            preOrderProducts: preOrders
         });
+
+        // clear pending selections after booking
+        this.pendingPreOrderProducts = [];
 
         // Identify client for future sessions (My Bookings page)
         localStorage.setItem('barbergo_client_name', name);

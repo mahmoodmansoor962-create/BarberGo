@@ -202,6 +202,40 @@ class DatabaseService {
         }
     }
 
+    // Service management helpers
+    async updateService(serviceId, updates) {
+        if (this.useRealFirebase && this.db) {
+            try {
+                await this.db.collection('services').doc(serviceId.toString()).update(updates);
+            } catch (err) {
+                console.error('Firestore updateService error', err);
+                throw err;
+            }
+        } else {
+            const svc = window.db.services.find(s => s.id === serviceId || s.id.toString() === serviceId.toString());
+            if (svc) {
+                Object.assign(svc, updates);
+                window.saveDB && window.saveDB();
+            }
+        }
+        return true;
+    }
+
+    async deleteService(serviceId) {
+        if (this.useRealFirebase && this.db) {
+            try {
+                await this.db.collection('services').doc(serviceId.toString()).delete();
+            } catch (err) {
+                console.error('Firestore deleteService error', err);
+                throw err;
+            }
+        } else {
+            window.db.services = window.db.services.filter(s => !(s.id === serviceId || s.id.toString() === serviceId.toString()));
+            window.saveDB && window.saveDB();
+        }
+        return true;
+    }
+
     scheduleFeedbackNotificationForBooking(booking) {
         if (!booking || booking.feedbackNotificationCreated || booking.status === 'cancelled') return;
 

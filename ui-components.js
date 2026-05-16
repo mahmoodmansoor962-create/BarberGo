@@ -194,7 +194,7 @@ const UI = {
                                 <img src="${p.image}" alt="${p.name}">
                                 <h4>${p.name}</h4>
                                 <div class="price">JOD ${p.price}</div>
-                                <button class="btn btn-outline btn-block text-white" style="border-color: #333; color: #fff !important;">إضافة</button>
+                                <button class="btn btn-outline btn-block text-white" style="border-color: #333; color: #fff !important;" onclick="app.togglePreOrderProduct(${p.id}, this)">إضافه للطلب والتحضير</button>
                             </div>
                         `).join('')}
                     </div>
@@ -667,6 +667,7 @@ const UI = {
                                         <div class="text-muted" style="font-size: 0.85rem;"><i class="fa-regular fa-clock"></i> \${b.time}</div>
                                     </div>
                                     <div class="text-white mb-3" style="font-size: 0.9rem;"><i class="fa-solid fa-scissors text-muted"></i> \${svcName}</div>
+                                    \${b.preOrderProducts && b.preOrderProducts.length ? `<div class="text-gold mb-2" style="font-size: 0.95rem; font-weight:600;">المنتجات المطلوب تحضيرها: ${b.preOrderProducts.map(p => p.productName).join(', ')}</div>` : ''}
                                     <button class="btn w-100 mt-2 text-danger" style="background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.3); font-weight: bold; padding: 10px;" onclick="app.cancelBooking(this, '\${b.customer_name}')">إلغاء الحجز وإرسال تنبيه للعميل</button>
                                 </div>`;
                             }).join('');
@@ -797,12 +798,15 @@ const UI = {
                     </div>
                     <div id="services-list-container">
                     ${db.services.filter(s => s.barber_id === barberId).map(s => `
-                        <div class="pill-box p-3 mb-2 d-flex justify-content-between align-items-center" style="border-left: 3px solid var(--gold-primary);">
+                        <div id="svc-${s.id}" class="pill-box p-3 mb-2 d-flex justify-content-between align-items-center" style="border-left: 3px solid var(--gold-primary);">
                             <div class="text-right">
                                 <h4 class="m-0 text-white">${s.name}</h4>
                                 <div class="text-muted" style="font-size: 0.85rem; margin-top: 5px;"><i class="fa-regular fa-clock"></i> ${s.duration} دقيقة | <i class="fa-solid fa-tag"></i> JOD ${s.price}</div>
                             </div>
-                            <button class="btn btn-ghost text-danger p-2" onclick="app.toggleSetting('حذف الخدمة')"><i class="fa-solid fa-trash"></i></button>
+                            <div style="display: flex; gap: 6px; align-items: center;">
+                                <button class="btn btn-ghost p-2 text-gold" title="تعديل" onclick="app.startEditService(${s.id}, this)"><i class="fa-solid fa-pen"></i></button>
+                                <button class="btn btn-ghost text-danger p-2" title="حذف" onclick="app.confirmDeleteService(${s.id}, this)"><i class="fa-solid fa-trash"></i></button>
+                            </div>
                         </div>
                     `).join('')}
                     </div>
