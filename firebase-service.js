@@ -3,7 +3,9 @@
 class DatabaseService {
     constructor() {
         // To use REAL Firebase, initialize here with your config
-        this.useRealFirebase = false;
+        // Warning: set to true only after you add your Firebase SDK and config below.
+        // When enabled and `window.firebase` is available the service will initialize.
+        this.useRealFirebase = true;
         this.db = null;
         this.auth = null;
         this.mockListeners = new Map(); // barberId => Map(listenerId => callback)
