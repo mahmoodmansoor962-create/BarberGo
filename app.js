@@ -74,6 +74,8 @@ class App {
                 const foundBarber = window.db.barbers.find(b => b.id === bId);
                 const bName = foundBarber ? foundBarber.name : 'أيها الحلاق';
                 window.notifier.show("مرحباً بك", `أهلاً بك مجدداً في لوحة التحكم الخاصة بك يا ${bName}.`, "success");
+                // Check for subscription expiry window and notify if within 48 hours
+                try { this.checkBarberExpiryNotification(bId); } catch (e) { console.error(e); }
                 return;
             } else if (session === 'client') {
                 this.navigate('clientHome');
@@ -152,6 +154,25 @@ class App {
 
         this.appElement.innerHTML = html;
         window.scrollTo(0, 0);
+        // If navigating to barber dashboard, run expiry notification check
+        if (view === 'barberDashboard' && params && params.id) {
+            try { this.checkBarberExpiryNotification(params.id); } catch (e) { console.error(e); }
+        }
+    }
+
+    checkBarberExpiryNotification(barberId) {
+        const barber = window.db.barbers.find(b => b.id === barberId);
+        if (!barber) return;
+        const expiryRaw = barber.subscriptionEndDate || barber.expiryDate || barber.subscriptionEnd || null;
+        if (!expiryRaw) return;
+        const expiry = new Date(expiryRaw);
+        if (isNaN(expiry.getTime())) return;
+        const remainingMs = expiry.getTime() - Date.now();
+        const twoDaysMs = 48 * 60 * 60 * 1000;
+        if (remainingMs <= twoDaysMs && remainingMs >= 0) {
+            const hoursLeft = Math.ceil(remainingMs / (60 * 60 * 1000));
+            window.notifier && window.notifier.show && window.notifier.show('انتباه: انتهاء الاشتراك', `اشتراك صفحتك سينتهي خلال ${hoursLeft} ساعة. يرجى تجديده للحفاظ على ظهور الصالون للعملاء.`, 'info');
+        }
     }
 
     // Interactions & Routing Helpers
@@ -414,24 +435,39 @@ class App {
 
     deleteService(serviceId, btnEl) {
         const confirmDel = confirm("هل أنت متأكد من حذف هذه الخدمة؟");
-        if (confirmDel) {
-            // Prefer real backend if available
-            if (window.dbService && typeof window.dbService.deleteService === 'function') {
-                window.dbService.deleteService(serviceId).then(() => {
-                    window.db.services = window.db.services.filter(s => s.id !== serviceId);
-                    window.saveDB && window.saveDB();
-                    if (btnEl) btnEl.closest('.pill-box').remove();
-                    window.notifier.show("حذف الخدمة", "تم حذف الخدمة بنجاح.", "info");
-                }).catch(err => {
-                    console.error(err);
-                    window.notifier.show("خطأ", "فشل حذف الخدمة. حاول مجدداً.", "error");
-                });
-            } else {
-                window.db.services = window.db.services.filter(s => s.id !== serviceId);
-                window.saveDB && window.saveDB();
-                if (btnEl) btnEl.closest('.pill-box').remove();
-                window.notifier.show("حذف الخدمة", "تم حذف الخدمة بنجاح.", "info");
-            }
+        if (!confirmDel) return;
+
+        const svc = window.db.services.find(s => s.id === serviceId);
+        if (!svc) {
+            window.notifier.show('خطأ', 'لم يتم العثور على الخدمة للحذف.', 'error');
+            return;
+        }
+
+        // Optimistic UI update: remove locally first for immediate UX
+        try {
+            window.db.services = window.db.services.filter(s => s.id !== serviceId);
+            window.saveDB && window.saveDB();
+            if (btnEl) btnEl.closest('.pill-box').remove();
+        } catch (err) {
+            console.error('Local delete error', err);
+        }
+
+        // Call backend removal: prefer arrayRemove from barber document
+        if (window.dbService && typeof window.dbService.removeServiceFromBarber === 'function') {
+            window.dbService.removeServiceFromBarber(svc.barber_id, svc).then(() => {
+                window.notifier.show('حذف الخدمة', 'تم حذف الخدمة من السجل بنجاح.', 'info');
+            }).catch(err => {
+                console.error(err);
+                window.notifier.show('خطأ', 'فشل حذف الخدمة من الخادم. تحقق من الاتصال.', 'error');
+            });
+        } else if (window.dbService && typeof window.dbService.deleteService === 'function') {
+            // Fallback to deleting service doc if arrayRemove not available
+            window.dbService.deleteService(serviceId).then(() => {
+                window.notifier.show('حذف الخدمة', 'تم حذف الخدمة من السجل بنجاح.', 'info');
+            }).catch(err => {
+                console.error(err);
+                window.notifier.show('خطأ', 'فشل حذف الخدمة من الخادم.', 'error');
+            });
         }
     }
 

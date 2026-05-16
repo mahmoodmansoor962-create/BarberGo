@@ -238,6 +238,29 @@ class DatabaseService {
         return true;
     }
 
+    // Remove a service object from the barber document's services array using arrayRemove
+    async removeServiceFromBarber(barberId, serviceObj) {
+        if (this.useRealFirebase && this.db) {
+            try {
+                await this.db.collection('barbers').doc(barberId.toString()).update({
+                    services: firebase.firestore.FieldValue.arrayRemove(serviceObj)
+                });
+            } catch (err) {
+                console.error('Firestore removeServiceFromBarber error', err);
+                throw err;
+            }
+        } else {
+            // mock: remove from global services list and barber.services array
+            window.db.services = window.db.services.filter(s => !(s.id === serviceObj.id && s.barber_id === barberId));
+            const barber = window.db.barbers.find(b => b.id === barberId || b.id.toString() === barberId.toString());
+            if (barber && Array.isArray(barber.services)) {
+                barber.services = barber.services.filter(s => !(s.id === serviceObj.id));
+            }
+            window.saveDB && window.saveDB();
+        }
+        return true;
+    }
+
     scheduleFeedbackNotificationForBooking(booking) {
         if (!booking || booking.feedbackNotificationCreated || booking.status === 'cancelled') return;
 

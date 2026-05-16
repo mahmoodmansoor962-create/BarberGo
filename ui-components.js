@@ -525,13 +525,25 @@ const UI = {
             ${this.renderTopHeader('لوحة تحكم: ' + barber.name)}
             <div class="page container py-3" style="padding-bottom: 100px;">
                 
-                ${barber.subscriptionStatus === 'trial' ? `
-                    <div class="pill-box mb-4 text-right" style="border-right: 4px solid #e74c3c; background: rgba(231,76,60,0.1);">
-                        <h4 class="text-danger mb-2"><i class="fa-solid fa-triangle-exclamation"></i> تنبيه: اشتراكك ينتهي قريباً</h4>
-                        <p class="text-white mb-3" style="font-size: 0.85rem; line-height: 1.6;">سينتهي الاشتراك التجريبي (30 يوم). نرجو التجديد لضمان استمرار ظهور صالونك للعملاء، لا تفوت زبائنك!</p>
-                        <button class="btn btn-outline text-danger w-100" style="border-color: #e74c3c;" onclick="app.showAdminPayoutDetails()">إظهار بيانات دفع المنصة للإشتراك</button>
+                ${(() => {
+                    const expiryRaw = barber.subscriptionEndDate || barber.expiryDate || barber.subscriptionEnd || null;
+                    if (!expiryRaw) return '';
+                    const expiry = new Date(expiryRaw);
+                    if (isNaN(expiry.getTime())) return '';
+                    const remainingMs = expiry.getTime() - Date.now();
+                    const twoDaysMs = 48 * 60 * 60 * 1000;
+                    // Show alert only within 48 hours or less and not already expired
+                    if (remainingMs <= twoDaysMs && remainingMs >= 0) {
+                        return `
+                    <div class="pill-box mb-4 text-right" style="border-right: 4px solid var(--gold-primary); background: rgba(212,175,55,0.05);">
+                        <h4 class="text-gold mb-2"><i class="fa-solid fa-triangle-exclamation"></i> تنبيه: اشتراكك سينتهي قريباً</h4>
+                        <p class="text-white mb-3" style="font-size: 0.85rem; line-height: 1.6;">ستنتهي صلاحية اشتراكك خلال أقل من يومين. يرجى تجديده للحفاظ على ظهور الصالون أمام العملاء.</p>
+                        <button class="btn btn-outline text-gold w-100" style="border-color: var(--gold-primary);" onclick="app.showAdminPayoutDetails()">إظهار بيانات الدفع</button>
                     </div>
-                ` : ''}
+                        `;
+                    }
+                    return '';
+                })()}
 
                 <!-- Barber Navigation Tabs -->
                 <div class="tabs-container" style="overflow-x: auto; white-space: nowrap; gap: 15px; border-bottom: none; margin-bottom: 25px; padding-bottom: 10px;">
