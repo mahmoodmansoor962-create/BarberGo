@@ -8,9 +8,11 @@ class DatabaseService {
         this.useRealFirebase = true;
         this.db = null;
         this.auth = null;
+        this.customerUid = null;
         this.mockListeners = new Map(); // barberId => Map(listenerId => callback)
         this.feedbackTimers = new Map();
         this.activeSnapshotListeners = new Map();
+        this.authReady = Promise.resolve();
 
         if (this.useRealFirebase && window.firebase) {
             const firebaseConfig = {
@@ -24,9 +26,77 @@ class DatabaseService {
             firebase.initializeApp(firebaseConfig);
             this.db = firebase.firestore();
             this.auth = firebase.auth();
+            this.authReady = this._initializeAnonymousAuth();
         } else {
             console.warn("DB_SERVICE: Running in Mock Mode. Enable useRealFirebase when ready.");
+            this._ensureLocalCustomerUid();
         }
+    }
+
+    async _initializeAnonymousAuth() {
+        let resolved = false;
+        return new Promise((resolve) => {
+            const finish = (uid) => {
+                if (resolved) return;
+                resolved = true;
+                this.customerUid = uid;
+                localStorage.setItem('barbergo_customer_uid', uid);
+                if (!localStorage.getItem('barbergo_session')) {
+                    localStorage.setItem('barbergo_session', 'client');
+                }
+                resolve(uid);
+            };
+
+            if (!this.auth) {
+                finish(this._ensureLocalCustomerUid());
+                return;
+            }
+
+            this.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch((err) => {
+                console.warn('Unable to set Firebase auth persistence:', err);
+            });
+
+            this.auth.onAuthStateChanged(async (user) => {
+                if (user && user.uid) {
+                    finish(user.uid);
+                    return;
+                }
+
+                try {
+                    const result = await this.auth.signInAnonymously();
+                    if (result && result.user && result.user.uid) {
+                        finish(result.user.uid);
+                    } else {
+                        finish(this._ensureLocalCustomerUid());
+                    }
+                } catch (error) {
+                    console.error('Firebase anonymous sign-in failed:', error);
+                    finish(this._ensureLocalCustomerUid());
+                }
+            });
+        });
+    }
+
+    _ensureLocalCustomerUid() {
+        let uid = localStorage.getItem('barbergo_customer_uid');
+        if (!uid) {
+            uid = `local_${Math.random().toString(36).slice(2)}_${Date.now()}`;
+            localStorage.setItem('barbergo_customer_uid', uid);
+        }
+        this.customerUid = uid;
+        if (!localStorage.getItem('barbergo_session')) {
+            localStorage.setItem('barbergo_session', 'client');
+        }
+        return uid;
+    }
+
+    getCustomerUid() {
+        return this.customerUid || this._ensureLocalCustomerUid();
+    }
+
+    async ensureAuthReady() {
+        await this.authReady;
+        return this.getCustomerUid();
     }
 
     // Connect WebSockets or Real-time Listeners
@@ -72,14 +142,21 @@ class DatabaseService {
     }
 
     async bookAppointment(data) {
+        await this.ensureAuthReady();
+        const barber = window.db && window.db.barbers ? window.db.barbers.find(b => b.id === data.barber_id || b.id.toString() === data.barber_id.toString()) : null;
+        const barberUid = barber ? (barber.uid || barber.barber_uid || null) : null;
         if (this.useRealFirebase) {
             const docRef = await this.db.collection("bookings").add({
                 ...data,
+                customer_uid: this.getCustomerUid(),
+                barber_uid: barberUid,
                 status: 'pending',
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
 
             const newBooking = { id: docRef.id, status: 'pending', ...data };
+            newBooking.customer_uid = this.getCustomerUid();
+            if (barberUid) newBooking.barber_uid = barberUid;
             if (window.db) {
                 window.db.bookings = window.db.bookings || [];
                 window.db.bookings.push(newBooking);
@@ -92,7 +169,8 @@ class DatabaseService {
             return new Promise((resolve) => {
                 setTimeout(() => {
                     console.log("Saving booking to Persistent DB:", data);
-                    const newBooking = { id: Date.now(), status: 'pending', ...data };
+                    const newBooking = { id: Date.now(), status: 'pending', ...data, customer_uid: this.getCustomerUid() };
+                    if (barberUid) newBooking.barber_uid = barberUid;
 
                     if (window.db) {
                         window.db.bookings.push(newBooking);

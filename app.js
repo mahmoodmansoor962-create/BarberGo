@@ -47,6 +47,9 @@ class App {
         document.documentElement.dir = this.language === 'ar' ? 'rtl' : 'ltr';
         this.debouncedFilterBarbers = this.debounce(this.filterBarbers.bind(this), 120);
         this.pendingPreOrderProducts = [];
+        if (window.dbService && typeof window.dbService.ensureAuthReady === 'function') {
+            window.dbService.ensureAuthReady().catch(err => console.warn('Anonymous auth init failed:', err));
+        }
         if (window.dbService && typeof window.dbService.initFeedbackScheduler === 'function') {
             window.dbService.initFeedbackScheduler();
         }
@@ -772,7 +775,7 @@ class App {
         const name = document.getElementById('customer-name').value;
         const selectedSlot = document.querySelector('.time-slot.selected');
 
-        if (!name || name.split(' ').length < 2) {
+        if (!name || !name.trim()) {
             window.notifier.show("خطأ", "الرجاء إدخال الاسم الثنائي.", "error");
             return;
         }
@@ -900,8 +903,12 @@ class App {
         }
     }
 
-    verifyBarberEmail(passedEmail = null) {
+    async verifyBarberEmail(passedEmail = null) {
         const email = passedEmail || (document.getElementById('barber-email') ? document.getElementById('barber-email').value : 'google_auth');
+
+        if (window.dbService && typeof window.dbService.ensureAuthReady === 'function') {
+            await window.dbService.ensureAuthReady();
+        }
 
         if (email) {
             // Find or Create Barber
@@ -927,8 +934,19 @@ class App {
                     settings: { slotDurationMinutes: 30, workingHours: '10:00 ص - 10:00 م' },
                     paymentMethods: {}
                 };
+                const barberUid = window.dbService && typeof window.dbService.getCustomerUid === 'function' ? window.dbService.getCustomerUid() : null;
+                if (barberUid) {
+                    barber.barber_uid = barberUid;
+                }
                 db.barbers.push(barber);
                 window.saveDB(); // Persist changes
+            }
+            else {
+                const barberUid = window.dbService && typeof window.dbService.getCustomerUid === 'function' ? window.dbService.getCustomerUid() : null;
+                if (barberUid && !barber.barber_uid) {
+                    barber.barber_uid = barberUid;
+                    window.saveDB();
+                }
             }
 
             localStorage.setItem('barbergo_session', 'barber_' + barber.id);
