@@ -48,6 +48,8 @@ class App {
         this.debouncedFilterBarbers = this.debounce(this.filterBarbers.bind(this), 120);
         this.pendingPreOrderProducts = [];
         this.heavyUILoadPromise = null;
+        this.serviceWorkerRegistered = false;
+        this.registerServiceWorker();
         if (window.dbService && typeof window.dbService.ensureAuthReady === 'function') {
             window.dbService.ensureAuthReady().catch(err => console.warn('Anonymous auth init failed:', err));
         }
@@ -89,6 +91,7 @@ class App {
         }
 
         this.navigate('welcome');
+        this.askPushNotificationsPermission();
     }
 
     logout() {
@@ -140,6 +143,8 @@ class App {
                 html = UI.renderBarberEmailSetup();
                 break;
             case 'barberDashboard':
+                html = this.renderLoadingPlaceholder();
+                this.appElement.innerHTML = html;
                 try { await this.loadHeavyUI(); } catch (err) { }
                 html = UI.renderBarberDashboard(params.id || 1);
                 break;
@@ -150,6 +155,8 @@ class App {
                 html = UI.renderAdminEmailSetup();
                 break;
             case 'adminDashboard':
+                html = this.renderLoadingPlaceholder();
+                this.appElement.innerHTML = html;
                 try { await this.loadHeavyUI(); } catch (err) { }
                 html = UI.renderAdminDashboard();
                 setTimeout(() => { if (window.app) window.app.initAdminChart(); }, 100);
@@ -179,6 +186,46 @@ class App {
             const hoursLeft = Math.ceil(remainingMs / (60 * 60 * 1000));
             window.notifier && window.notifier.show && window.notifier.show('انتباه: انتهاء الاشتراك', `اشتراك صفحتك سينتهي خلال ${hoursLeft} ساعة. يرجى تجديده للحفاظ على ظهور الصالون للعملاء.`, 'info');
         }
+    }
+
+    renderLoadingPlaceholder() {
+        return `
+            <div class="page container py-5 text-center">
+                <div class="pill-box" style="padding: 30px;">
+                    <div class="text-gold" style="font-size: 1.25rem;">جاري تحميل المحتوى...</div>
+                    <div class="text-muted" style="font-size: 0.95rem; margin-top: 10px;">الرجاء الانتظار للحظة.</div>
+                </div>
+            </div>
+        `;
+    }
+
+    async registerServiceWorker() {
+        if (!('serviceWorker' in navigator)) return;
+        try {
+            const registration = await navigator.serviceWorker.register('/sw.js');
+            this.serviceWorkerRegistered = true;
+            console.info('Service Worker registered:', registration.scope);
+        } catch (err) {
+            console.warn('Service Worker registration failed:', err);
+        }
+    }
+
+    askPushNotificationsPermission() {
+        if (!('Notification' in window) || Notification.permission !== 'default') return;
+        if (localStorage.getItem('barbergo_push_prompt_shown') === 'true') return;
+        localStorage.setItem('barbergo_push_prompt_shown', 'true');
+        setTimeout(async () => {
+            try {
+                const permission = await Notification.requestPermission();
+                if (permission === 'granted') {
+                    window.notifier && window.notifier.show && window.notifier.show('تم تفعيل الإشعارات', 'ستتلقى تذكيرات الحجز والتحديثات من BarberGo.', 'success');
+                } else if (permission === 'denied') {
+                    window.notifier && window.notifier.show && window.notifier.show('تم تعطيل الإشعارات', 'لن يتم إرسال تذكيرات الدفع والإشعارات الفورية.', 'info');
+                }
+            } catch (err) {
+                console.warn('Push notification permission prompt failed:', err);
+            }
+        }, 1300);
     }
 
     // Interactions & Routing Helpers
@@ -902,6 +949,7 @@ class App {
         const email = document.getElementById('admin-email').value || 'admin';
         if (email) {
             localStorage.setItem('barbergo_session', 'admin');
+            this.askPushNotificationsPermission();
             this.navigate('adminDashboard');
         } else {
             window.notifier.show("خطأ", "يرجى إدخال بريد إلكتروني صحيح", "warning");
@@ -971,6 +1019,7 @@ class App {
                 window.notifier.show("مرحباً بك", `أهلاً بك مجدداً في لوحة التحكم يا ${barber.name}.`, "success");
             }
 
+            this.askPushNotificationsPermission();
             this.navigate('barberDashboard', { id: barber.id });
         } else {
             window.notifier.show("خطأ", "يرجى إدخال بريد إلكتروني صحيح", "warning");

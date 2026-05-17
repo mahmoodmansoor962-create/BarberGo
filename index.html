@@ -18,7 +18,7 @@
 
     <!-- Manifest for PWA -->
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#D4AF37">
+    <meta name="theme-color" content="#000000">
 
     <!-- Main CSS -->
     <link rel="stylesheet" href="styles.css">
@@ -28,16 +28,13 @@
     <div id="app"></div>
     <div id="toast-container"></div>
 
-    <!-- Firebase SDK (Production Architecture) -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <!-- Firebase Service -->
+    <script type="module" src="firebase-service.js" defer></script>
 
     <!-- Scripts -->
-    <script src="firebase-service.js"></script>
-    <script src="notifications.js"></script>
-    <script src="data.js"></script>
-    <script src="ui-components.js"></script>
+    <script src="notifications.js" defer></script>
+    <script src="data.js" defer></script>
+    <script src="ui-components.js" defer></script>
     <script type="module" src="app.js"></script>
 </body>
 
