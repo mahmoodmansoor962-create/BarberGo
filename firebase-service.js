@@ -25,6 +25,7 @@ class DatabaseService {
             };
             firebase.initializeApp(firebaseConfig);
             this.db = firebase.firestore();
+            this._enableFirestorePersistence();
             this.auth = firebase.auth();
             this.authReady = this._initializeAnonymousAuth();
         } else {
@@ -97,6 +98,23 @@ class DatabaseService {
     async ensureAuthReady() {
         await this.authReady;
         return this.getCustomerUid();
+    }
+
+    _enableFirestorePersistence() {
+        if (!this.db || !firebase || !firebase.firestore) return;
+        this.db.enablePersistence({ synchronizeTabs: true })
+            .then(() => {
+                console.info('Firestore persistence enabled.');
+            })
+            .catch((err) => {
+                if (err.code === 'failed-precondition') {
+                    console.warn('Firestore persistence disabled because multiple tabs are open.');
+                } else if (err.code === 'unimplemented') {
+                    console.warn('Firestore persistence is not supported by this browser.');
+                } else {
+                    console.warn('Firestore persistence error:', err);
+                }
+            });
     }
 
     // Connect WebSockets or Real-time Listeners

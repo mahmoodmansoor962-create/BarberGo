@@ -47,6 +47,7 @@ class App {
         document.documentElement.dir = this.language === 'ar' ? 'rtl' : 'ltr';
         this.debouncedFilterBarbers = this.debounce(this.filterBarbers.bind(this), 120);
         this.pendingPreOrderProducts = [];
+        this.heavyUILoadPromise = null;
         if (window.dbService && typeof window.dbService.ensureAuthReady === 'function') {
             window.dbService.ensureAuthReady().catch(err => console.warn('Anonymous auth init failed:', err));
         }
@@ -101,7 +102,7 @@ class App {
         }
     }
 
-    navigate(view, params = {}) {
+    async navigate(view, params = {}) {
         this.currentView = view;
         this.currentParams = params;
 
@@ -139,6 +140,7 @@ class App {
                 html = UI.renderBarberEmailSetup();
                 break;
             case 'barberDashboard':
+                try { await this.loadHeavyUI(); } catch (err) { }
                 html = UI.renderBarberDashboard(params.id || 1);
                 break;
             case 'adminLogin':
@@ -148,6 +150,7 @@ class App {
                 html = UI.renderAdminEmailSetup();
                 break;
             case 'adminDashboard':
+                try { await this.loadHeavyUI(); } catch (err) { }
                 html = UI.renderAdminDashboard();
                 setTimeout(() => { if (window.app) window.app.initAdminChart(); }, 100);
                 break;
@@ -179,6 +182,17 @@ class App {
     }
 
     // Interactions & Routing Helpers
+    async loadHeavyUI() {
+        if (!this.heavyUILoadPromise) {
+            this.heavyUILoadPromise = import('./ui-heavy-routes.js')
+                .catch(err => {
+                    console.error('Heavy UI failed to load:', err);
+                    throw err;
+                });
+        }
+        return this.heavyUILoadPromise;
+    }
+
     toggleLanguage() {
         this.language = this.language === 'ar' ? 'en' : 'ar';
         localStorage.setItem('barbergo_lang', this.language);
