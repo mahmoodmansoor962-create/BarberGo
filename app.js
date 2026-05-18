@@ -938,6 +938,11 @@ class App {
     // Admin Auth
     verifyAdmin() {
         const pass = document.getElementById('admin-password').value;
+        if (!pass || pass.trim() === '') {
+            window.notifier.show("خطأ", "يرجى إدخال كلمة المرور", "error");
+            return;
+        }
+        
         if (pass === 'mahmoud2005') {
             this.navigate('adminEmailSetup');
         } else {
@@ -946,18 +951,61 @@ class App {
     }
 
     verifyAdminEmail() {
-        const email = document.getElementById('admin-email').value || 'admin';
-        if (email) {
+        const emailInput = document.getElementById('admin-email');
+        const email = emailInput ? emailInput.value : 'admin';
+        
+        if (!email || email.trim() === '') {
+            window.notifier.show("خطأ", "يرجى إدخال بريد إلكتروني صحيح", "warning");
+            return;
+        }
+        
+        // Disable button to prevent multiple submissions
+        const btn = document.getElementById('admin-submit-btn');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerText = 'جاري المعالجة...';
+        }
+
+        // Add timeout to prevent freezing
+        const timeout = setTimeout(() => {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerText = 'دخول للوحة التحكم';
+            }
+            window.notifier.show("خطأ", "انتهت مهلة الانتظار. يرجى محاولة مرة أخرى.", "error");
+        }, 5000);
+
+        try {
             localStorage.setItem('barbergo_session', 'admin');
+            clearTimeout(timeout);
+            
             this.askPushNotificationsPermission();
             this.navigate('adminDashboard');
-        } else {
-            window.notifier.show("خطأ", "يرجى إدخال بريد إلكتروني صحيح", "warning");
+            
+            if (btn) {
+                btn.disabled = false;
+                btn.innerText = 'دخول للوحة التحكم';
+            }
+        } catch (err) {
+            clearTimeout(timeout);
+            if (btn) {
+                btn.disabled = false;
+                btn.innerText = 'دخول للوحة التحكم';
+            }
+            window.notifier.show("خطأ", "حدث خطأ أثناء تسجيل الدخول", "error");
+            console.error('Admin email verification error:', err);
         }
     }
 
     verifyBarber() {
-        const code = document.getElementById('barber-code').value;
+        const codeInput = document.getElementById('barber-code');
+        const code = codeInput ? codeInput.value : '';
+        
+        if (!code || code.trim() === '') {
+            window.notifier.show("خطأ", "يرجى إدخال رمز الدخول", "error");
+            return;
+        }
+        
         if (code === '0000') {
             this.navigate('barberEmailSetup');
         } else {
@@ -966,13 +1014,39 @@ class App {
     }
 
     async verifyBarberEmail(passedEmail = null) {
-        const email = passedEmail || (document.getElementById('barber-email') ? document.getElementById('barber-email').value : 'google_auth');
+        const emailInput = document.getElementById('barber-email');
+        const email = passedEmail || (emailInput ? emailInput.value : 'google_auth');
 
-        if (window.dbService && typeof window.dbService.ensureAuthReady === 'function') {
-            await window.dbService.ensureAuthReady();
+        if (!email || email.trim() === '') {
+            window.notifier.show("خطأ", "يرجى إدخال بريد إلكتروني صحيح", "warning");
+            return;
         }
 
-        if (email) {
+        // Disable button to prevent multiple submissions
+        const btn = document.getElementById('barber-submit-btn');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerText = 'جاري المعالجة...';
+        }
+
+        // Add timeout to prevent infinite hanging on mobile networks
+        const timeout = setTimeout(() => {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerText = 'دخول للوحة التحكم';
+            }
+            window.notifier.show("خطأ", "انتهت مهلة الانتظار. يرجى التحقق من اتصالك بالإنترنت ثم حاول مرة أخرى.", "error");
+        }, 8000);
+
+        try {
+            // Initialize Firebase auth with timeout
+            if (window.dbService && typeof window.dbService.ensureAuthReady === 'function') {
+                await Promise.race([
+                    window.dbService.ensureAuthReady(),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Auth timeout')), 5000))
+                ]);
+            }
+
             // Find or Create Barber
             let barber = db.barbers.find(b => b.email === email);
             let isNew = false;
@@ -1011,6 +1085,7 @@ class App {
                 }
             }
 
+            clearTimeout(timeout);
             localStorage.setItem('barbergo_session', 'barber_' + barber.id);
 
             if (isNew) {
@@ -1021,8 +1096,19 @@ class App {
 
             this.askPushNotificationsPermission();
             this.navigate('barberDashboard', { id: barber.id });
-        } else {
-            window.notifier.show("خطأ", "يرجى إدخال بريد إلكتروني صحيح", "warning");
+            
+            if (btn) {
+                btn.disabled = false;
+                btn.innerText = 'دخول للوحة التحكم';
+            }
+        } catch (err) {
+            clearTimeout(timeout);
+            if (btn) {
+                btn.disabled = false;
+                btn.innerText = 'دخول للوحة التحكم';
+            }
+            console.error('Barber email verification error:', err);
+            window.notifier.show("خطأ", "حدث خطأ أثناء التحقق من البريد الإلكتروني. تحقق من اتصالك بالإنترنت وحاول مرة أخرى.", "error");
         }
     }
 

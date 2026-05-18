@@ -31,9 +31,14 @@
     <!-- Firebase Service -->
     <script type="module" src="firebase-service.js" defer></script>
 
-    <!-- Scripts -->
+    <!-- Scripts with proper loading order for performance -->
     <script src="notifications.js" defer></script>
     <script src="data.js" defer></script>
+    
+    <!-- Lazy-load component files for better mobile performance -->
+    <script src="component-header.js" defer></script>
+    <script src="component-loginform.js" defer></script>
+    
     <script src="ui-components.js" defer></script>
     <script type="module" src="app.js"></script>
 </body>

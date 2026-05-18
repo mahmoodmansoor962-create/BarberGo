@@ -742,3 +742,348 @@ h6 {
   cursor: not-allowed;
   border-color: rgba(255, 0, 0, 0.1);
 }
+
+/* ==========================================================================
+   Mobile & Responsive Design
+========================================================================== */
+
+/* Ensure body is always visible on all devices */
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+#app {
+  flex: 1;
+}
+
+/* Tablet and mobile optimization */
+@media (max-width: 768px) {
+  .container {
+    max-width: 100%;
+    padding: 0 15px;
+  }
+
+  body {
+    padding-bottom: 100px;
+  }
+
+  /* Ensure header is always visible and responsive */
+  .top-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .header-actions {
+    gap: 8px;
+  }
+
+  .lang-btn,
+  .bell-btn {
+    padding: 6px 10px;
+    font-size: 0.8rem;
+  }
+
+  /* Make bottom nav more touch-friendly */
+  .bottom-nav {
+    height: 80px;
+    width: 95%;
+  }
+
+  .nav-item {
+    font-size: 0.7rem;
+    padding: 8px 4px;
+  }
+
+  .nav-item i {
+    font-size: 1rem;
+  }
+
+  /* Schedule grid for mobile */
+  .schedule-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .time-slot {
+    padding: 12px 8px;
+    font-size: 0.85rem;
+  }
+
+  /* Products grid for mobile */
+  .products-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .product-card img {
+    height: 150px;
+  }
+
+  /* Barber grid for mobile */
+  .barbers-list {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .barber-grid-card {
+    padding: 12px;
+  }
+
+  /* Profile image for mobile */
+  .profile-img-container {
+    width: 120px;
+    height: 120px;
+    margin: -60px auto 15px;
+  }
+
+  .profile-cover {
+    height: 150px;
+  }
+
+  /* Pills and boxes for mobile */
+  .pill-box {
+    padding: 16px;
+    border-radius: var(--radius-md);
+  }
+
+  /* Form inputs for mobile */
+  .form-control {
+    font-size: 16px !important;
+    padding: 12px !important;
+    min-height: 44px;
+  }
+
+  /* Service pills for mobile */
+  .service-pill {
+    flex-direction: column;
+    text-align: right;
+  }
+
+  .service-action .btn {
+    width: 100%;
+    padding: 10px 15px;
+    font-size: 0.9rem;
+  }
+
+  /* Address box for mobile */
+  .address-box {
+    flex-direction: column;
+    text-align: right;
+    gap: 10px;
+  }
+
+  /* Social icons for mobile */
+  .social-icons-row {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .social-icon {
+    width: 50px;
+    height: 50px;
+    font-size: 1.2rem;
+  }
+
+  /* Buttons for mobile */
+  .btn {
+    padding: 12px 18px;
+    min-height: 44px;
+    font-size: 0.95rem;
+  }
+
+  .btn-block {
+    width: 100%;
+  }
+
+  /* Toast notifications for mobile */
+  #toast-container {
+    top: 60px;
+    right: 10px;
+    left: 10px;
+  }
+
+  .toast {
+    min-width: auto;
+    max-width: 100%;
+    font-size: 0.9rem;
+  }
+
+  /* Ensure search bar is responsive */
+  .search-bar {
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .search-bar input {
+    min-height: 44px;
+  }
+
+  /* Tabs for mobile */
+  .tabs-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tab-item {
+    font-size: 0.9rem;
+    padding: 12px 10px;
+    min-width: max-content;
+  }
+
+  /* Fix for iOS Safari viewport issues */
+  input,
+  select,
+  textarea,
+  button {
+    font-size: 16px !important;
+  }
+}
+
+/* Small mobile devices (portrait) */
+@media (max-width: 480px) {
+  .container {
+    padding: 0 12px;
+  }
+
+  .schedule-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .time-slot {
+    padding: 10px 6px;
+    font-size: 0.8rem;
+  }
+
+  .pill-box {
+    padding: 12px;
+    margin-bottom: 15px;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    word-break: break-word;
+  }
+
+  .btn {
+    padding: 10px 16px;
+    font-size: 0.9rem;
+    min-height: 40px;
+  }
+
+  .profile-cover {
+    height: 120px;
+  }
+
+  .profile-img-container {
+    width: 100px;
+    height: 100px;
+    margin: -50px auto 12px;
+  }
+
+  .barbers-list {
+    gap: 10px;
+  }
+
+  .social-icon {
+    width: 45px;
+    height: 45px;
+    font-size: 1rem;
+  }
+
+  .top-header .container {
+    padding: 0 8px;
+  }
+
+  .nav-item span {
+    font-size: 0.65rem;
+  }
+}
+
+/* Landscape orientation optimization */
+@media (max-width: 768px) and (orientation: landscape) {
+  body {
+    padding-bottom: 80px;
+  }
+
+  .bottom-nav {
+    height: 60px;
+  }
+
+  .nav-item {
+    font-size: 0.65rem;
+  }
+
+  .page {
+    padding-bottom: 80px !important;
+  }
+}
+
+/* Extra small devices */
+@media (max-width: 360px) {
+  .container {
+    padding: 0 10px;
+  }
+
+  .schedule-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .time-slot {
+    padding: 8px 4px;
+    font-size: 0.75rem;
+  }
+
+  .social-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 0.9rem;
+  }
+
+  .btn {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+  }
+}
+
+/* High resolution mobile devices (pixel ratio) */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  /* Optimize for retina displays */
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Fix for iPhone X and notch devices */
+@supports (padding: max(0px)) {
+  body {
+    padding-left: max(0px, env(safe-area-inset-left));
+    padding-right: max(0px, env(safe-area-inset-right));
+    padding-bottom: max(100px, env(safe-area-inset-bottom));
+  }
+
+  .bottom-nav-container {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Ensure smooth scrolling on mobile */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Prevent layout shift on mobile */
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}

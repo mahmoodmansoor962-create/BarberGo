@@ -1,50 +1,15 @@
 // Advanced UI Components and View Renderers for BarberGo
+// Note: Header components (renderTopHeader, renderBottomNav) are now in component-header.js
+// Note: Login forms are now in component-loginform.js
 
 const UI = {
+    // Use separated header components for better performance
     renderTopHeader(title = 'BarberGo') {
-        const langText = window.app && window.app.language === 'en' ? 'عربي' : 'English';
-        return `
-            <header class="top-header">
-                <div class="container">
-                    <div class="header-actions">
-                        <button class="lang-btn" onclick="app.toggleLanguage()"><i class="fa-solid fa-globe"></i> ${langText}</button>
-                        <button class="bell-btn" onclick="app.openNotifications()">
-                            <i class="fa-regular fa-bell"></i>
-                            <span class="bell-dot"></span>
-                        </button>
-                    </div>
-                    <div class="navbar-brand">
-                        <span class="text-gold" style="font-size: 1.2rem;">${title}</span>
-                    </div>
-                    <div>
-                        <button class="btn btn-ghost" style="font-size: 0.8rem; padding: 5px 10px; color: var(--gold-primary);" onclick="app.navigate('welcome')">الخيارات</button>
-                    </div>
-                </div>
-            </header>
-        `;
+        return window.HeaderComponent ? window.HeaderComponent.renderTopHeader(title) : '';
     },
 
     renderBottomNav(activeTab = 'home') {
-        const lang = window.app && window.app.language ? window.app.language : 'ar';
-        const i18n = window.i18n ? window.i18n[lang] : { settings: 'الإعدادات', home: 'الرئيسية' };
-        
-        return `
-            <div class="bottom-nav-container">
-                <div class="bottom-nav">
-                    <div class="nav-item ${activeTab === 'settings' ? 'active' : ''}" onclick="app.navigate('clientSettings')">
-                        <i class="fa-solid fa-gear"></i>
-                        <span>${i18n.settings}</span>
-                    </div>
-                    <div class="nav-center-action" onclick="app.navigate('aiCamera')">
-                        <i class="fa-solid fa-scissors"></i>
-                    </div>
-                    <div class="nav-item ${activeTab === 'home' ? 'active' : ''}" onclick="app.navigate('clientHome')">
-                        <i class="fa-solid fa-house"></i>
-                        <span>${i18n.home}</span>
-                    </div>
-                </div>
-            </div>
-        `;
+        return window.HeaderComponent ? window.HeaderComponent.renderBottomNav(activeTab) : '';
     },
 
     // ==========================================
@@ -482,41 +447,11 @@ const UI = {
     // 2. Barber Dashboard Features
     // ==========================================
     renderBarberLogin() {
-        return `
-            ${this.renderTopHeader('بوابة الحلاقين')}
-            <div class="page container py-5" style="max-width: 400px;">
-                <div class="pill-box text-center">
-                    <div class="ai-icon mb-4"><i class="fa-solid fa-store"></i></div>
-                    <h2 class="text-gold mb-4">الدخول لصالونك</h2>
-                    <div class="form-group">
-                        <input type="password" id="barber-code" class="form-control text-center" style="-webkit-text-security: disc;" placeholder="رمز الدخول">
-                    </div>
-                    <button class="btn btn-primary btn-block mb-3" onclick="app.verifyBarber()">متابعة</button>
-                </div>
-                <button class="btn btn-ghost w-100" onclick="app.navigate('welcome')">العودة للرئيسية</button>
-            </div>
-        `;
+        return window.LoginFormComponent ? window.LoginFormComponent.renderBarberLogin() : '';
     },
 
     renderBarberEmailSetup() {
-        return `
-            ${this.renderTopHeader('بوابة الحلاقين')}
-            <div class="page container py-5" style="max-width: 400px;">
-                <div class="pill-box text-center">
-                    <div class="ai-icon mb-4" style="border-color: #e74c3c; color: #e74c3c;"><i class="fa-brands fa-google"></i></div>
-                    <h2 class="text-gold mb-3">ربط البريد الإلكتروني</h2>
-                    <p class="text-muted mb-4" style="font-size: 0.85rem;">لأغراض الأمان والحجوزات، يرجى إدخال حساب الـ Gmail الخاص بك للمتابعة</p>
-                    <div class="form-group mb-4">
-                        <input type="email" id="barber-email" class="form-control text-left" dir="ltr" placeholder="example@gmail.com">
-                    </div>
-                    <button class="btn btn-primary btn-block mb-3" onclick="app.verifyBarberEmail()">دخول للوحة التحكم</button>
-                    <div class="text-muted mb-3" style="font-size: 0.8rem;">أو الدخول مباشرة بـ:</div>
-                    <button class="btn btn-ghost btn-block" style="border: 1px solid #333;" onclick="app.verifyBarberEmail()">
-                        <i class="fa-brands fa-google text-danger"></i> Google Login
-                    </button>
-                </div>
-            </div>
-        `;
+        return window.LoginFormComponent ? window.LoginFormComponent.renderBarberEmailSetup() : '';
     },
 
     renderBarberDashboard(barberId) {
@@ -531,41 +466,11 @@ const UI = {
     },
 
     renderAdminLogin() {
-        return `
-            ${this.renderTopHeader('لوحة المدير')}
-            <div class="page container py-5" style="max-width: 400px;">
-                <div class="pill-box text-center">
-                    <div class="ai-icon mb-4"><i class="fa-solid fa-shield-halved"></i></div>
-                    <h2 class="text-gold mb-4">بوابة الإدارة</h2>
-                    <div class="form-group">
-                        <input type="password" id="admin-password" class="form-control text-center" style="-webkit-text-security: disc;" placeholder="كلمة المرور">
-                    </div>
-                    <button class="btn btn-primary btn-block mb-3" onclick="app.verifyAdmin()">متابعة</button>
-                </div>
-                <button class="btn btn-ghost w-100" onclick="app.navigate('welcome')">العودة للرئيسية</button>
-            </div>
-        `;
+        return window.LoginFormComponent ? window.LoginFormComponent.renderAdminLogin() : '';
     },
 
     renderAdminEmailSetup() {
-        return `
-            ${this.renderTopHeader('لوحة المدير')}
-            <div class="page container py-5" style="max-width: 400px;">
-                <div class="pill-box text-center">
-                    <div class="ai-icon mb-4" style="border-color: #e74c3c; color: #e74c3c;"><i class="fa-brands fa-google"></i></div>
-                    <h2 class="text-gold mb-3">ربط البريد الإلكتروني للمدير</h2>
-                    <p class="text-muted mb-4" style="font-size: 0.85rem;">يرجى تأكيد حساب الـ Gmail الخاص بك كبوابة تسجيل آمنة</p>
-                    <div class="form-group mb-4">
-                        <input type="email" id="admin-email" class="form-control text-left" dir="ltr" placeholder="admin@gmail.com">
-                    </div>
-                    <button class="btn btn-primary btn-block mb-3" onclick="app.verifyAdminEmail()">دخول للوحة التحكم</button>
-                    <div class="text-muted mb-3" style="font-size: 0.8rem;">أو الدخول مباشرة بـ:</div>
-                    <button class="btn btn-ghost btn-block" style="border: 1px solid #333;" onclick="app.verifyAdminEmail()">
-                        <i class="fa-brands fa-google text-danger"></i> Google Login
-                    </button>
-                </div>
-            </div>
-        `;
+        return window.LoginFormComponent ? window.LoginFormComponent.renderAdminEmailSetup() : '';
     },
 
     renderAdminDashboard() {
