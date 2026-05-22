@@ -12,6 +12,22 @@ const UI = {
         return window.HeaderComponent ? window.HeaderComponent.renderBottomNav(activeTab) : '';
     },
 
+    renderLoadingIndicator() {
+        return `<div class="barbergo-loading-spinner"></div>`;
+    },
+
+    renderLoadingPlaceholder(message = 'جاري تحميل المحتوى...') {
+        return `
+            <div class="page container py-5 text-center" style="min-height: calc(100vh - 90px); background: var(--bg-main);">
+                <div class="pill-box" style="padding: 30px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+                    ${this.renderLoadingIndicator()}
+                    <div class="text-gold" style="font-size: 1.25rem; margin-top: 20px;">${message}</div>
+                    <div class="text-muted" style="font-size: 0.95rem; margin-top: 10px;">الرجاء الانتظار قليلاً بينما يتم تحميل البيانات.</div>
+                </div>
+            </div>
+        `;
+    },
+
     // ==========================================
     // 1. Client Features
     // ==========================================

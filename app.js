@@ -41,6 +41,8 @@ window.i18n = {
 class App {
     constructor() {
         this.appElement = document.getElementById('app');
+        this.ensureInitialDarkShell();
+        this.insertLoadingAnimationsStyle();
         this.currentView = 'welcome';
         this.currentParams = {};
         this.language = localStorage.getItem('barbergo_lang') || 'ar'; // Real persistence
@@ -57,6 +59,39 @@ class App {
             window.dbService.initFeedbackScheduler();
         }
         this.init();
+    }
+
+    ensureInitialDarkShell() {
+        if (this.appElement) {
+            this.appElement.style.backgroundColor = '#000000';
+            this.appElement.style.minHeight = '100vh';
+            this.appElement.style.color = '#ffffff';
+        }
+        if (document.body) {
+            document.body.style.backgroundColor = '#000000';
+        }
+    }
+
+    insertLoadingAnimationsStyle() {
+        if (document.getElementById('barbergo-loading-styles')) return;
+        const style = document.createElement('style');
+        style.id = 'barbergo-loading-styles';
+        style.textContent = `
+            @keyframes barbergo-spinner-rotate {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+            }
+            .barbergo-loading-spinner {
+                width: 52px;
+                height: 52px;
+                border: 4px solid rgba(255,255,255,0.14);
+                border-top-color: var(--gold-primary);
+                border-radius: 50%;
+                animation: barbergo-spinner-rotate 1s linear infinite;
+                margin: 0 auto;
+            }
+        `;
+        document.head.appendChild(style);
     }
 
     init() {
@@ -106,6 +141,12 @@ class App {
     }
 
     async navigate(view, params = {}) {
+        if (this.appElement) {
+            this.appElement.style.backgroundColor = '#000000';
+        }
+        if (document.body) {
+            document.body.style.backgroundColor = '#000000';
+        }
         this.currentView = view;
         this.currentParams = params;
 
@@ -188,15 +229,8 @@ class App {
         }
     }
 
-    renderLoadingPlaceholder() {
-        return `
-            <div class="page container py-5 text-center">
-                <div class="pill-box" style="padding: 30px;">
-                    <div class="text-gold" style="font-size: 1.25rem;">جاري تحميل المحتوى...</div>
-                    <div class="text-muted" style="font-size: 0.95rem; margin-top: 10px;">الرجاء الانتظار للحظة.</div>
-                </div>
-            </div>
-        `;
+    renderLoadingPlaceholder(message = 'جاري تحميل المحتوى...') {
+        return UI.renderLoadingPlaceholder(message);
     }
 
     async registerServiceWorker() {
