@@ -13,7 +13,14 @@ const UI = {
     },
 
     renderLoadingIndicator() {
-        return `<div class="barbergo-loading-spinner"></div>`;
+        return `
+            <svg width="52" height="52" viewBox="0 0 50 50" style="display:block; margin: 0 auto;">
+                <circle cx="25" cy="25" r="20" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="4" />
+                <path d="M25 5 a20 20 0 0 1 0 40" fill="none" stroke="var(--gold-primary)" stroke-width="4" stroke-linecap="round">
+                    <animateTransform attributeName="transform" type="rotate" from="0 25 25" to="360 25 25" dur="1s" repeatCount="indefinite" />
+                </path>
+            </svg>
+        `;
     },
 
     renderLoadingPlaceholder(message = 'جاري تحميل المحتوى...') {

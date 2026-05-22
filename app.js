@@ -42,7 +42,6 @@ class App {
     constructor() {
         this.appElement = document.getElementById('app');
         this.ensureInitialDarkShell();
-        this.insertLoadingAnimationsStyle();
         this.currentView = 'welcome';
         this.currentParams = {};
         this.language = localStorage.getItem('barbergo_lang') || 'ar'; // Real persistence
@@ -51,6 +50,7 @@ class App {
         this.pendingPreOrderProducts = [];
         this.heavyUILoadPromise = null;
         this.serviceWorkerRegistered = false;
+        this.buildId = this.getAppVersion();
         this.registerServiceWorker();
         if (window.dbService && typeof window.dbService.ensureAuthReady === 'function') {
             window.dbService.ensureAuthReady().catch(err => console.warn('Anonymous auth init failed:', err));
@@ -58,7 +58,7 @@ class App {
         if (window.dbService && typeof window.dbService.initFeedbackScheduler === 'function') {
             window.dbService.initFeedbackScheduler();
         }
-        this.init();
+        this.startInit();
     }
 
     ensureInitialDarkShell() {
@@ -72,29 +72,61 @@ class App {
         }
     }
 
-    insertLoadingAnimationsStyle() {
-        if (document.getElementById('barbergo-loading-styles')) return;
-        const style = document.createElement('style');
-        style.id = 'barbergo-loading-styles';
-        style.textContent = `
-            @keyframes barbergo-spinner-rotate {
-                from { transform: rotate(0deg); }
-                to { transform: rotate(360deg); }
-            }
-            .barbergo-loading-spinner {
-                width: 52px;
-                height: 52px;
-                border: 4px solid rgba(255,255,255,0.14);
-                border-top-color: var(--gold-primary);
-                border-radius: 50%;
-                animation: barbergo-spinner-rotate 1s linear infinite;
-                margin: 0 auto;
-            }
-        `;
-        document.head.appendChild(style);
+    getAppVersion() {
+        if (window.APP_VERSION) {
+            return window.APP_VERSION;
+        }
+        const version = `v${new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 12)}`;
+        window.APP_VERSION = version;
+        return version;
     }
 
-    init() {
+    async startInit() {
+        try {
+            await this.init();
+        } catch (error) {
+            console.error('Startup failed:', error);
+            this.renderSafeFallback();
+        }
+    }
+
+    async waitForBootstrap() {
+        const dbReady = new Promise(resolve => {
+            if (window.db && window.db.barbers && window.db.services && window.db.bookings) {
+                return resolve();
+            }
+            const interval = setInterval(() => {
+                if (window.db && window.db.barbers && window.db.services && window.db.bookings) {
+                    clearInterval(interval);
+                    resolve();
+                }
+            }, 50);
+            setTimeout(() => {
+                clearInterval(interval);
+                resolve();
+            }, 3000);
+        });
+        await dbReady;
+        if (window.dbService && typeof window.dbService.ensureAuthReady === 'function') {
+            try {
+                await Promise.race([
+                    window.dbService.ensureAuthReady(),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('auth-init-timeout')), 5000))
+                ]);
+            } catch (err) {
+                console.warn('Auth ready timed out or failed:', err);
+            }
+        }
+    }
+
+    renderSafeFallback() {
+        if (this.appElement) {
+            this.appElement.innerHTML = UI.renderLoadingPlaceholder('حدث خطأ. جاري إعادة المحاولة...');
+        }
+    }
+
+    async init() {
+        await this.waitForBootstrap();
         // Full Real-App session detection
         const session = localStorage.getItem('barbergo_session');
 
@@ -186,7 +218,7 @@ class App {
             case 'barberDashboard':
                 html = this.renderLoadingPlaceholder();
                 this.appElement.innerHTML = html;
-                try { await this.loadHeavyUI(); } catch (err) { }
+                    try { await this.loadHeavyUI(); } catch (err) { console.warn('Heavy UI load failed:', err); }
                 html = UI.renderBarberDashboard(params.id || 1);
                 break;
             case 'adminLogin':
@@ -198,7 +230,7 @@ class App {
             case 'adminDashboard':
                 html = this.renderLoadingPlaceholder();
                 this.appElement.innerHTML = html;
-                try { await this.loadHeavyUI(); } catch (err) { }
+                try { await this.loadHeavyUI(); } catch (err) { console.warn('Heavy UI load failed:', err); }
                 html = UI.renderAdminDashboard();
                 setTimeout(() => { if (window.app) window.app.initAdminChart(); }, 100);
                 break;
@@ -206,7 +238,13 @@ class App {
                 html = UI.renderWelcome();
         }
 
-        this.appElement.innerHTML = html;
+        try {
+            this.appElement.innerHTML = html;
+        } catch (err) {
+            console.error('Render failed in navigate:', err);
+            this.renderSafeFallback();
+            return;
+        }
         window.scrollTo(0, 0);
         // If navigating to barber dashboard, run expiry notification check
         if (view === 'barberDashboard' && params && params.id) {
@@ -236,9 +274,12 @@ class App {
     async registerServiceWorker() {
         if (!('serviceWorker' in navigator)) return;
         try {
-            const registration = await navigator.serviceWorker.register('/sw.js');
+            const registration = await navigator.serviceWorker.register(`/sw.js?v=${this.buildId}`, { scope: '/' });
             this.serviceWorkerRegistered = true;
             console.info('Service Worker registered:', registration.scope);
+            if (registration && registration.update) {
+                registration.update().catch(() => {});
+            }
         } catch (err) {
             console.warn('Service Worker registration failed:', err);
         }
