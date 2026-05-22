@@ -46,10 +46,10 @@ const UI = {
                 <div class="container py-4">
                     <div class="search-bar mb-4 d-flex align-items-center p-1" style="background: var(--bg-card); border: 2px solid var(--gold-primary); border-radius: var(--radius-lg); box-shadow: var(--shadow-gold);">
                         <button class="location-btn btn btn-ghost" style="border-radius: 50%; padding: 10px;" onclick="app.requestLocation()"><i class="fa-solid fa-location-dot"></i></button>
-                        <input type="text" id="client-search-input" class="form-control" style="background: transparent; border: none; flex: 1; padding: 10px; color: #fff; text-align: right; outline: none; font-size: 1rem;" placeholder="${window.i18n[app.language].searchPlaceholder}" onkeyup="app.debouncedFilterBarbers()">
+                        <input type="text" id="client-search-input" class="form-control" style="background: transparent; border: none; flex: 1; padding: 10px; color: #fff; text-align: right; outline: none; font-size: 1rem;" placeholder="${window.i18n[window.app && window.app.language ? window.app.language : localStorage.getItem('barbergo_lang') || 'ar'].searchPlaceholder}" onkeyup="app.debouncedFilterBarbers()">
                         <button class="voice-btn btn btn-primary" style="border-radius: 50%; width: 50px; height: 50px; padding: 0;" onclick="app.startVoiceSearch(this)"><i class="fa-solid fa-microphone"></i></button>
                     </div>
-                    <h3 class="mb-3 text-right">${window.i18n[app.language].suggestedBarbers}</h3>
+                    <h3 class="mb-3 text-right">${window.i18n[window.app && window.app.language ? window.app.language : localStorage.getItem('barbergo_lang') || 'ar'].suggestedBarbers}</h3>
                     <div class="barbers-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                         ${barbersHtml}
                     </div>
@@ -72,7 +72,7 @@ const UI = {
                     </div>
                 </div>
                 <div class="service-action">
-                    <button class="btn btn-primary" onclick="app.navigate('bookingFlow', { barberId: ${barber.id}, serviceId: ${s.id} })">${window.i18n[app.language].bookAppointment}</button>
+                    <button class="btn btn-primary" onclick="app.navigate('bookingFlow', { barberId: ${barber.id}, serviceId: ${s.id} })">${window.i18n[window.app && window.app.language ? window.app.language : localStorage.getItem('barbergo_lang') || 'ar'].bookAppointment}</button>
                 </div>
             </div>
         `).join('');
@@ -100,21 +100,21 @@ const UI = {
                     ${crowdHtml}
                     <p class="text-muted mb-4" style="font-size: 0.9rem;">"${barber.bio}"</p>
                     
-                    <h3 class="text-right text-gold mb-3"><i class="fa-regular fa-calendar"></i> ${window.i18n[app.language].services}</h3>
+                    <h3 class="text-right text-gold mb-3"><i class="fa-regular fa-calendar"></i> ${window.i18n[window.app && window.app.language ? window.app.language : localStorage.getItem('barbergo_lang') || 'ar'].services}</h3>
                     <div class="services-container mb-4">${servicesHtml}</div>
 
                     <div class="ai-camera-box pill-box pill-box-outline cursor-pointer" onclick="app.navigate('aiCamera')">
                         <div class="ai-icon"><i class="fa-solid fa-camera"></i></div>
-                        <h3 class="text-gold mb-1">${window.i18n[app.language].aiMirror}</h3>
-                        <p class="text-muted" style="font-size: 0.8rem;">${window.i18n[app.language].aiDesc}</p>
+                        <h3 class="text-gold mb-1">${window.i18n[window.app && window.app.language ? window.app.language : localStorage.getItem('barbergo_lang') || 'ar'].aiMirror}</h3>
+                        <p class="text-muted" style="font-size: 0.8rem;">${window.i18n[window.app && window.app.language ? window.app.language : localStorage.getItem('barbergo_lang') || 'ar'].aiDesc}</p>
                     </div>
 
-                    <h3 class="text-right text-gold mb-3"><i class="fa-solid fa-map-location-dot"></i> ${window.i18n[app.language].location}</h3>
+                    <h3 class="text-right text-gold mb-3"><i class="fa-solid fa-map-location-dot"></i> ${window.i18n[window.app && window.app.language ? window.app.language : localStorage.getItem('barbergo_lang') || 'ar'].location}</h3>
                     
                     <div class="address-box">
                         <button class="btn btn-ghost" style="padding: 5px 10px; border: 1px solid var(--gold-primary); color: var(--gold-primary);"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>
                         <div class="text-right">
-                            <div class="text-muted" style="font-size: 0.8rem;">${window.i18n[app.language].address}</div>
+                            <div class="text-muted" style="font-size: 0.8rem;">${window.i18n[window.app && window.app.language ? window.app.language : localStorage.getItem('barbergo_lang') || 'ar'].address}</div>
                             <div style="font-weight: bold; font-size: 1.1rem; color: #fff;">${barber.location}</div>
                         </div>
                         <div class="address-icon"><i class="fa-solid fa-location-dot"></i></div>

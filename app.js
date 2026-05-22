@@ -1579,6 +1579,9 @@ class App {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    window.app = new App();
+// Strict initialization: Ensure App is created exactly once after DOM is ready
+window.addEventListener('DOMContentLoaded', () => {
+    if (!window.app) {
+        window.app = new App();
+    }
 });
