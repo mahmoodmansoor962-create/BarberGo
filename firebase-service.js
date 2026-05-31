@@ -6,6 +6,7 @@ import {
   collection,
   query,
   where,
+  getDocs,
   onSnapshot,
   addDoc,
   updateDoc,
@@ -72,47 +73,59 @@ class DatabaseService {
   }
 
   async _initializeAnonymousAuth() {
-    let resolved = false;
-    return new Promise(resolve => {
-      const finish = uid => {
-        if (resolved) return;
-        resolved = true;
-        this.customerUid = uid;
-        localStorage.setItem('barbergo_customer_uid', uid);
-        if (!localStorage.getItem('barbergo_session')) {
-          localStorage.setItem('barbergo_session', 'client');
-        }
-        resolve(uid);
-      };
-
-      if (!this.auth) {
-        finish(this._ensureLocalCustomerUid());
-        return;
+    try {
+      if (!this.auth) return this._ensureLocalCustomerUid();
+      try {
+        await setPersistence(this.auth, browserLocalPersistence);
+      } catch (err) {
+        console.warn('Unable to set Firebase auth persistence:', err);
       }
 
-      setPersistence(this.auth, browserLocalPersistence).catch(err => {
-        console.warn('Unable to set Firebase auth persistence:', err);
-      });
+      // If there's already a signed-in user, use it, otherwise attempt a one-time anonymous sign-in.
+      if (this.auth.currentUser && this.auth.currentUser.uid) {
+        const uid = this.auth.currentUser.uid;
+        this.customerUid = uid;
+        localStorage.setItem('barbergo_customer_uid', uid);
+        if (!localStorage.getItem('barbergo_session')) localStorage.setItem('barbergo_session', 'client');
+        return uid;
+      }
 
-      onAuthStateChanged(this.auth, async user => {
-        if (user && user.uid) {
-          finish(user.uid);
-          return;
-        }
+      const result = await signInAnonymously(this.auth);
+      if (result && result.user && result.user.uid) {
+        const uid = result.user.uid;
+        this.customerUid = uid;
+        localStorage.setItem('barbergo_customer_uid', uid);
+        if (!localStorage.getItem('barbergo_session')) localStorage.setItem('barbergo_session', 'client');
+        return uid;
+      }
+    } catch (error) {
+      console.error('Firebase anonymous sign-in failed:', error);
+    }
 
+    return this._ensureLocalCustomerUid();
+  }
+
+  // One-time shallow fetch for initial app bootstrap. Returns an object mapping collection names to arrays.
+  async fetchInitialCollections(names = ['barbers', 'services', 'products', 'bookings', 'notifications']) {
+    const result = {};
+    if (!this.useRealFirebase || !this.db) return result;
+
+    try {
+      for (const name of names) {
         try {
-          const result = await signInAnonymously(this.auth);
-          if (result && result.user && result.user.uid) {
-            finish(result.user.uid);
-          } else {
-            finish(this._ensureLocalCustomerUid());
-          }
-        } catch (error) {
-          console.error('Firebase anonymous sign-in failed:', error);
-          finish(this._ensureLocalCustomerUid());
+          const collRef = collection(this.db, name);
+          const snap = await getDocs(collRef);
+          result[name] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        } catch (err) {
+          console.warn(`fetchInitialCollections: failed to fetch ${name}:`, err);
+          result[name] = [];
         }
-      });
-    });
+      }
+    } catch (err) {
+      console.error('fetchInitialCollections failed:', err);
+    }
+
+    return result;
   }
 
   _ensureLocalCustomerUid() {

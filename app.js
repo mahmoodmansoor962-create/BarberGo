@@ -52,12 +52,45 @@ class App {
         this.serviceWorkerRegistered = false;
         this.buildId = this.getAppVersion();
         this.registerServiceWorker();
-        if (window.dbService && typeof window.dbService.ensureAuthReady === 'function') {
-            window.dbService.ensureAuthReady().catch(err => console.warn('Anonymous auth init failed:', err));
-        }
-        if (window.dbService && typeof window.dbService.initFeedbackScheduler === 'function') {
-            window.dbService.initFeedbackScheduler();
-        }
+        // Non-blocking detached DB bootstrap: authenticate briefly and perform one-time shallow fetches.
+        (async () => {
+            try {
+                if (window.dbService && typeof window.dbService.ensureAuthReady === 'function') {
+                    await Promise.race([
+                        window.dbService.ensureAuthReady(),
+                        new Promise((_, reject) => setTimeout(() => reject(new Error('auth-init-timeout')), 5000))
+                    ]);
+                }
+
+                if (window.dbService && typeof window.dbService.fetchInitialCollections === 'function') {
+                    try {
+                        const initial = await window.dbService.fetchInitialCollections(['barbers','services','products','bookings','notifications','adminSettings']);
+                        if (initial && Object.keys(initial).length > 0) {
+                            window.db = window.db || {};
+                            for (const k of Object.keys(initial)) {
+                                if (Array.isArray(initial[k])) {
+                                    if (!window.db[k] || window.db[k].length === 0) window.db[k] = initial[k];
+                                } else if (initial[k] && typeof initial[k] === 'object') {
+                                    window.db[k] = Object.assign(window.db[k] || {}, initial[k]);
+                                }
+                            }
+                            if (window.saveDB && typeof window.saveDB === 'function') {
+                                try { await window.saveDB(); } catch (e) { console.warn('saveDB after initial fetch failed:', e); }
+                            }
+                        }
+                    } catch (err) {
+                        console.warn('fetchInitialCollections failed:', err);
+                    }
+                }
+
+                if (window.dbService && typeof window.dbService.initFeedbackScheduler === 'function') {
+                    // Start the scheduler but do not await; it's non-blocking
+                    try { window.dbService.initFeedbackScheduler(); } catch (e) { console.warn('initFeedbackScheduler failed:', e); }
+                }
+            } catch (err) {
+                console.warn('Non-blocking DB bootstrap failed:', err);
+            }
+        })();
         this.startInit();
     }
 
