@@ -1,8 +1,4 @@
 {
-  "compression": {
-    "brotli": true,
-    "gzip": true
-  },
   "headers": [
     {
       "source": "/(.*).(css|js|png|jpg|jpeg|svg|webp|ico|json|xml|webmanifest)",
