@@ -44,6 +44,22 @@ class DatabaseService {
         appId: '1:123456789:web:abcdef'
       };
 
+      if (this._isPlaceholderFirebaseConfig(firebaseConfig)) {
+        console.warn('Firebase config appears placeholder or invalid; running in mock mode to avoid bad network auth calls.');
+        this.useRealFirebase = false;
+      }
+    }
+
+    if (this.useRealFirebase) {
+      const firebaseConfig = {
+        apiKey: 'YOUR_API_KEY',
+        authDomain: 'your-app.firebaseapp.com',
+        projectId: 'your-project-id',
+        storageBucket: 'your-app.appspot.com',
+        messagingSenderId: '123456789',
+        appId: '1:123456789:web:abcdef'
+      };
+
       try {
         const app = initializeApp(firebaseConfig);
         this.db = initializeFirestore(app, { localCache: true });
@@ -64,12 +80,19 @@ class DatabaseService {
         this.authReady = this._initializeAnonymousAuth();
       } catch (error) {
         console.warn('Firebase initialization failed, falling back to mock mode.', error);
+        this.useRealFirebase = false;
         this._ensureLocalCustomerUid();
       }
     } else {
       console.warn('DB_SERVICE: Running in Mock Mode. Enable useRealFirebase when ready.');
       this._ensureLocalCustomerUid();
     }
+  }
+
+  _isPlaceholderFirebaseConfig(config) {
+    if (!config || typeof config !== 'object') return true;
+    const merged = `${config.apiKey || ''} ${config.authDomain || ''} ${config.projectId || ''}`.toLowerCase();
+    return /your_api_key|your-app|project-id|example|firebaseapp\.com/.test(merged);
   }
 
   async _initializeAnonymousAuth() {
