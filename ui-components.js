@@ -40,7 +40,7 @@ const UI = {
     // ==========================================
     renderClientHome() {
         // Sort barbers so that favorites are on top
-        const sortedBarbers = [...db.barbers]
+        const sortedBarbers = [...(window.db?.barbers || [])]
             .filter(b => b.isPublished !== false) // Default to true if undefined, but hide if explicitly false
             .sort((a, b) => {
                 if (a.isFavorite && !b.isFavorite) return -1;
@@ -83,8 +83,8 @@ const UI = {
     },
 
     renderBarberProfile(barberId) {
-        const barber = db.barbers.find(b => b.id === barberId);
-        const services = db.services.filter(s => s.barber_id === barberId);
+        const barber = (window.db?.barbers || []).find(b => b.id === barberId);
+        const services = (window.db?.services || []).filter(s => s.barber_id === barberId);
 
         const servicesHtml = services.map(s => `
             <div class="service-pill">
@@ -245,7 +245,7 @@ const UI = {
     },
 
     renderBookingFlow(barberId, serviceId) {
-        const service = db.services.find(s => s.id === serviceId);
+        const service = (window.db?.services || []).find(s => s.id === serviceId);
         return `
             ${this.renderTopHeader('حجز موعد')}
             <div class="page container py-4" style="padding-bottom: 100px;">

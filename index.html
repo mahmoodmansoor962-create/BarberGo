@@ -31,19 +31,26 @@
     <div id="app"></div>
     <div id="toast-container"></div>
 
-    <!-- Firebase Service -->
+    <!-- CRITICAL: Load all dependencies FIRST with defer to ensure proper ordering -->
+    <!-- Firebase must be first (module), other scripts are regular with defer -->
     <script type="module" src="firebase-service.js" defer></script>
-
-    <!-- Scripts with proper loading order for performance -->
+    
+    <!-- Notifications system - required for UI fallbacks -->
     <script src="notifications.js" defer></script>
+    
+    <!-- Data persistence layer -->
     <script src="data.js" defer></script>
     
-    <!-- Lazy-load component files for better mobile performance -->
+    <!-- Component libraries - lazy-load for performance -->
     <script src="component-header.js" defer></script>
     <script src="component-loginform.js" defer></script>
     
+    <!-- UI components - MUST load before app.js -->
     <script src="ui-components.js" defer></script>
-    <script type="module" src="app.js?v=2.0.0"></script>
+    
+    <!-- Main app - loaded LAST with defer to ensure all dependencies are ready -->
+    <!-- NOTE: This is a regular script (not module) with defer to prevent execution before dependencies -->
+    <script src="app.js?v=2.0.0" defer></script>
 </body>
 
 </html>

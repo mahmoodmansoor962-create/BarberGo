@@ -2,9 +2,20 @@
 window.UI = window.UI || {};
 
 UI.renderBarberDashboard = function(barberId) {
-    const barber = db.barbers.find(b => b.id === barberId);
+    const barber = (window.db?.barbers || []).find(b => b.id === barberId);
+    if (!barber) {
+        return `
+            <div class="page container py-5 text-center" style="min-height: 100vh; background: var(--bg-main);">
+                <div class="pill-box" style="padding: 30px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+                    <h3 class="text-gold mb-3">خطأ: الحلاق غير موجود</h3>
+                    <p class="text-muted">معرّف الحلاق: ${barberId}</p>
+                    <button class="btn btn-primary mt-3" onclick="app.navigate('welcome')">العودة للرئيسية</button>
+                </div>
+            </div>
+        `;
+    }
     return `
-            ${this.renderTopHeader('لوحة تحكم: ' + barber.name)}
+            ${this.renderTopHeader('لوحة تحكم: ' + (barber.name || 'الحلاق'))}
             <div class="page container py-3" style="padding-bottom: 100px;">
                 
                 ${(() => {
@@ -42,10 +53,10 @@ UI.renderBarberDashboard = function(barberId) {
                     <h3 class="text-gold text-right mb-3"><i class="fa-solid fa-chart-line"></i> إحصائيات متقدمة</h3>
                     <div class="products-grid mb-4" style="grid-template-columns: 1fr 1fr; gap: 10px;">
                         ${(() => {
-                            const bBookings = db.bookings.filter(b => b.barber_id === barberId);
+                            const bBookings = (window.db?.bookings || []).filter(b => b.barber_id === barberId);
                             const confirmedBookings = bBookings.filter(b => b.status === 'confirmed' || b.status === 'completed');
                             const totalRev = confirmedBookings.reduce((sum, b) => {
-                                const svc = db.services.find(s => s.id === b.service_id);
+                                const svc = (window.db?.services || []).find(s => s.id === b.service_id);
                                 return sum + (svc ? svc.price : 0);
                             }, 0);
                             const dailyRev = Math.round(totalRev * 0.1);
@@ -271,7 +282,7 @@ UI.renderBarberDashboard = function(barberId) {
                         <div class="text-muted mt-1" style="font-size: 0.85rem;">أضف اسم الخدمة، السعر، والوقت المستغرق</div>
                     </div>
                     <div id="services-list-container">
-                    ${db.services.filter(s => s.barber_id === barberId).map(s => `
+                    ${(window.db?.services || []).filter(s => s.barber_id === barberId).map(s => `
                         <div id="svc-${s.id}" class="pill-box p-3 mb-2 d-flex justify-content-between align-items-center" style="border-left: 3px solid var(--gold-primary);">
                             <div class="text-right">
                                 <h4 class="m-0 text-white">${s.name}</h4>
@@ -441,9 +452,9 @@ UI.renderBarberDashboard = function(barberId) {
 };
 
 UI.renderAdminDashboard = function() {
-    const barbers = db.barbers;
-    const totalClients = db.users.filter(u => u.type === 'client').length;
-    const adminData = db.adminSettings;
+    const barbers = window.db?.barbers || [];
+    const totalClients = (window.db?.users || []).filter(u => u.type === 'client').length;
+    const adminData = window.db?.adminSettings || {};
     const barbersRows = barbers.map(b => {
         let subBadge = b.subscriptionStatus === 'active' ? '<span class="text-success p-1" style="background: rgba(46, 204, 113, 0.1); border-radius: 5px; font-size: 0.8rem;">نشط</span>' :
                        b.subscriptionStatus === 'blocked' ? '<span class="text-danger p-1" style="background: rgba(231, 76, 60, 0.1); border-radius: 5px; font-size: 0.8rem;">محظور</span>' :

@@ -1,6 +1,11 @@
-// Application Logic and Component Router for BarberGo
+// ================================================================================
+// BarberGo Application Logic & Component Router - BULLETPROOF ARCHITECTURE
+// ================================================================================
+// DESIGN PRINCIPLE: UI renders INSTANTLY. Database operations occur silently
+// in the background. Network delays NEVER cause black screens or unresponsive UX.
+// ================================================================================
 
-// Dictionary for real bilingual system
+// Bilingual i18n Dictionary
 window.i18n = {
     ar: {
         settings: "الإعدادات",
@@ -38,60 +43,325 @@ window.i18n = {
     }
 };
 
-class App {
-    constructor() {
-        this.appElement = document.getElementById('app');
-        this.ensureInitialDarkShell();
-        this.currentView = 'welcome';
-        this.currentParams = {};
-        this.language = localStorage.getItem('barbergo_lang') || 'ar'; // Real persistence
-        document.documentElement.dir = this.language === 'ar' ? 'rtl' : 'ltr';
-        this.debouncedFilterBarbers = this.debounce(this.filterBarbers.bind(this), 120);
-        this.pendingPreOrderProducts = [];
-        this.heavyUILoadPromise = null;
-        this.serviceWorkerRegistered = false;
-        this.buildId = this.getAppVersion();
-        this.registerServiceWorker();
-        // Non-blocking detached DB bootstrap: authenticate briefly and perform one-time shallow fetches.
-        (async () => {
-            try {
-                if (window.dbService && typeof window.dbService.ensureAuthReady === 'function') {
-                    await Promise.race([
-                        window.dbService.ensureAuthReady(),
-                        new Promise((_, reject) => setTimeout(() => reject(new Error('auth-init-timeout')), 5000))
-                    ]);
-                }
+// ================================================================================
+// AGGRESSIVE STARTUP BYPASS - Force UI visible and avoid hidden startup crashes
+// ================================================================================
+(function () {
+    const getAppElement = () => document.getElementById('app');
+    const hideSplashScreens = () => {
+        const selectors = ['#loading', '.loading-screen', '.splash', '.preloader', '.app-loading'];
+        selectors.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (element) {
+                element.style.display = 'none';
+                element.style.visibility = 'hidden';
+                element.style.opacity = '0';
+            }
+        });
+    };
 
-                if (window.dbService && typeof window.dbService.fetchInitialCollections === 'function') {
-                    try {
-                        const initial = await window.dbService.fetchInitialCollections(['barbers','services','products','bookings','notifications','adminSettings']);
-                        if (initial && Object.keys(initial).length > 0) {
-                            window.db = window.db || {};
-                            for (const k of Object.keys(initial)) {
-                                if (Array.isArray(initial[k])) {
-                                    if (!window.db[k] || window.db[k].length === 0) window.db[k] = initial[k];
-                                } else if (initial[k] && typeof initial[k] === 'object') {
-                                    window.db[k] = Object.assign(window.db[k] || {}, initial[k]);
-                                }
-                            }
-                            if (window.saveDB && typeof window.saveDB === 'function') {
-                                try { await window.saveDB(); } catch (e) { console.warn('saveDB after initial fetch failed:', e); }
-                            }
+    const enforceAppVisibility = () => {
+        try {
+            const appEl = getAppElement();
+            if (appEl) {
+                appEl.style.display = 'block';
+                appEl.style.visibility = 'visible';
+                appEl.style.opacity = '1';
+                appEl.style.position = 'relative';
+                appEl.style.zIndex = '9999';
+                appEl.style.minHeight = '100vh';
+                appEl.style.backgroundColor = '#000';
+            }
+
+            if (document.body) {
+                document.body.style.display = 'block';
+                document.body.style.visibility = 'visible';
+                document.body.style.opacity = '1';
+                document.body.style.backgroundColor = '#000';
+                document.body.style.position = 'relative';
+                document.body.style.zIndex = '9998';
+                document.body.style.overflow = 'auto';
+            }
+
+            hideSplashScreens();
+        } catch (err) {
+            console.warn('[BYPASS] enforceAppVisibility failed:', err);
+        }
+    };
+
+    window.forceBarberGoUI = enforceAppVisibility;
+    window.forceBarberGoUI();
+    setTimeout(() => window.forceBarberGoUI(), 100);
+    setTimeout(() => window.forceBarberGoUI(), 400);
+    setTimeout(() => window.forceBarberGoUI(), 900);
+
+    if (!window.db) {
+        window.db = { barbers: [], services: [], products: [], bookings: [], notifications: [] };
+    }
+
+    if (!window.UI) {
+        window.UI = {
+            renderLoadingPlaceholder: (msg) => `<div style="padding:40px;text-align:center;color:#fff;background:#000;min-height:100vh;">${msg}</div>`,
+            renderWelcome: () => '<div style="padding:40px;text-align:center;color:#fff;background:#000;min-height:100vh;">Loading BarberGo...</div>'
+        };
+    }
+
+    if (!window.notifier) {
+        window.notifier = {
+            show: (title, message) => console.log(`[NOTIFIER] ${title}: ${message}`)
+        };
+    }
+})();
+
+// ================================================================================
+// ISOLATED BACKGROUND BOOTSTRAP PROCESS - Runs Async Without Blocking UI
+// ================================================================================
+// This process handles ALL database/Firebase operations independently.
+// If it fails or times out, UI remains functional with cached/fallback data.
+// ================================================================================
+class BackgroundBootstrapProcess {
+    constructor() {
+        this.completed = false;
+        this.error = null;
+        this.startTime = Date.now();
+        this.maxDurationMs = 12000; // Hard timeout after 12 seconds
+    }
+
+    async execute() {
+        try {
+            console.info('[BGP] Starting background bootstrap process...');
+            
+            // Phase 1: Wait for script dependencies (short timeout)
+            await this.waitForDependencies();
+            
+            // Phase 2: Initialize authentication (with timeout)
+            await this.initializeAuth();
+            
+            // Phase 3: Fetch initial collections (non-blocking)
+            await this.fetchInitialData();
+            
+            // Phase 4: Start background tasks
+            await this.startBackgroundTasks();
+            
+            this.completed = true;
+            console.info('[BGP] ✅ Background bootstrap completed successfully');
+        } catch (err) {
+            this.error = err;
+            console.warn('[BGP] ⚠️ Background bootstrap error (UI still functional):', err);
+        }
+    }
+
+    async waitForDependencies() {
+        const requiredGlobals = ['UI', 'notifier'];
+        const pollMs = 50;
+        const timeoutMs = 3000;
+        const startTime = Date.now();
+
+        while (Date.now() - startTime < timeoutMs) {
+            const ready = requiredGlobals.every(g => {
+                if (g === 'UI') return window.UI && typeof window.UI === 'object';
+                if (g === 'notifier') return window.notifier && typeof window.notifier.show === 'function';
+                return false;
+            });
+
+            if (ready) {
+                console.info('[BGP] ✓ UI & notifier dependencies ready');
+                return true;
+            }
+
+            await new Promise(resolve => setTimeout(resolve, pollMs));
+        }
+
+        console.warn('[BGP] UI/notifier not ready within timeout, continuing anyway...');
+        return false;
+    }
+
+    async initializeAuth() {
+        if (!window.dbService || typeof window.dbService.ensureAuthReady !== 'function') {
+            console.warn('[BGP] dbService not available for auth init');
+            return;
+        }
+
+        try {
+            await Promise.race([
+                window.dbService.ensureAuthReady(),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('auth-init-timeout')), 5000))
+            ]);
+            console.info('[BGP] ✓ Firebase authentication initialized');
+        } catch (err) {
+            console.warn('[BGP] Auth init failed (non-fatal):', err.message);
+        }
+    }
+
+    async fetchInitialData() {
+        if (!window.dbService || typeof window.dbService.fetchInitialCollections !== 'function') {
+            console.warn('[BGP] dbService.fetchInitialCollections not available');
+            return;
+        }
+
+        try {
+            const collections = ['barbers', 'services', 'products', 'bookings', 'notifications', 'adminSettings'];
+            const initial = await window.dbService.fetchInitialCollections(collections);
+            
+            if (initial && Object.keys(initial).length > 0) {
+                window.db = window.db || {};
+                for (const k of Object.keys(initial)) {
+                    if (Array.isArray(initial[k])) {
+                        if (!window.db[k] || window.db[k].length === 0) {
+                            window.db[k] = initial[k];
                         }
-                    } catch (err) {
-                        console.warn('fetchInitialCollections failed:', err);
+                    } else if (initial[k] && typeof initial[k] === 'object') {
+                        window.db[k] = Object.assign(window.db[k] || {}, initial[k]);
                     }
                 }
-
-                if (window.dbService && typeof window.dbService.initFeedbackScheduler === 'function') {
-                    // Start the scheduler but do not await; it's non-blocking
-                    try { window.dbService.initFeedbackScheduler(); } catch (e) { console.warn('initFeedbackScheduler failed:', e); }
+                
+                if (window.saveDB && typeof window.saveDB === 'function') {
+                    try {
+                        await window.saveDB();
+                        console.info('[BGP] ✓ Initial data fetched and persisted');
+                    } catch (e) {
+                        console.warn('[BGP] saveDB after fetch failed:', e);
+                    }
                 }
-            } catch (err) {
-                console.warn('Non-blocking DB bootstrap failed:', err);
             }
-        })();
-        this.startInit();
+        } catch (err) {
+            console.warn('[BGP] fetchInitialCollections failed:', err);
+        }
+    }
+
+    async startBackgroundTasks() {
+        if (!window.dbService || typeof window.dbService.initFeedbackScheduler !== 'function') {
+            console.warn('[BGP] initFeedbackScheduler not available');
+            return;
+        }
+
+        try {
+            window.dbService.initFeedbackScheduler();
+            console.info('[BGP] ✓ Feedback scheduler started');
+        } catch (e) {
+            console.warn('[BGP] initFeedbackScheduler failed:', e);
+        }
+    }
+
+    isHealthy() {
+        return this.completed && !this.error;
+    }
+
+    hasTimedOut() {
+        return Date.now() - this.startTime > this.maxDurationMs;
+    }
+}
+
+// Global instance for background bootstrap
+window._backgroundBootstrap = new BackgroundBootstrapProcess();
+
+// Start background bootstrap immediately after this script loads
+// This runs ASYNCHRONOUSLY and does NOT block the App constructor
+window._backgroundBootstrap.execute().catch(err => {
+    console.error('[BGP] Unhandled error in background bootstrap:', err);
+});
+
+// ================================================================================
+// MAIN APPLICATION CLASS - Renders UI Immediately, Defers DB Operations
+// ================================================================================
+class App {
+    constructor() {
+        try {
+            // CRITICAL: Initialize properties BEFORE rendering (no async waits here!)
+            this.appElement = document.getElementById('app');
+            if (this.appElement) {
+                this.appElement.style.display = 'block';
+                this.appElement.style.visibility = 'visible';
+                this.appElement.style.opacity = '1';
+                this.appElement.style.position = 'relative';
+                this.appElement.style.zIndex = '9999';
+                this.appElement.style.minHeight = '100vh';
+                this.appElement.style.backgroundColor = '#000';
+            }
+            document.body.style.backgroundColor = '#000';
+            document.body.style.display = 'block';
+            document.body.style.visibility = 'visible';
+            document.body.style.opacity = '1';
+            this.currentView = 'welcome';
+            this.currentParams = {};
+            this.language = localStorage.getItem('barbergo_lang') || 'ar';
+            this.debouncedFilterBarbers = this.debounce(this.filterBarbers.bind(this), 120);
+            this.pendingPreOrderProducts = [];
+            this.heavyUILoadPromise = null;
+            this.serviceWorkerRegistered = false;
+            this.buildId = this.getAppVersion();
+            this.initialized = false;
+
+            // Set language direction IMMEDIATELY
+            document.documentElement.dir = this.language === 'ar' ? 'rtl' : 'ltr';
+            document.documentElement.lang = this.language;
+
+            // Render dark shell IMMEDIATELY (no waiting!)
+            this.renderInitialDarkShell();
+
+            // Register service worker NON-BLOCKING (fire and forget)
+            this.registerServiceWorker().catch(err => {
+                console.warn('[App] Service Worker registration failed:', err);
+            });
+
+            // Start initialization in background WITHOUT blocking UI
+            this.startAsyncInitialization();
+        } catch (error) {
+            console.error('[App] 🔴 FATAL: App constructor crashed:', error);
+            this.renderSafeFallback();
+            throw error;
+        }
+    }
+
+    // ============================================================================
+    // ASYNC INITIALIZATION - Non-blocking background process
+    // ============================================================================
+    async startAsyncInitialization() {
+        try {
+            // Wait for UI library to be available (short timeout)
+            let uiReady = false;
+            for (let i = 0; i < 100; i++) {
+                if (window.UI && typeof window.UI === 'object') {
+                    uiReady = true;
+                    break;
+                }
+                await new Promise(resolve => setTimeout(resolve, 30));
+            }
+
+            if (!uiReady) {
+                console.warn('[App] UI library not ready, continuing with fallback...');
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+
+            // Now perform the full async init
+            await this.init();
+            this.initialized = true;
+
+        } catch (err) {
+            console.error('[App] Async initialization failed:', err);
+            this.renderSafeFallback();
+        }
+    }
+
+    renderInitialDarkShell() {
+        if (!this.appElement) return;
+        
+        // Set styles for dark shell container
+        this.appElement.style.backgroundColor = '#000000';
+        this.appElement.style.minHeight = '100vh';
+        this.appElement.style.color = '#ffffff';
+        this.appElement.style.display = 'flex';
+        this.appElement.style.alignItems = 'center';
+        this.appElement.style.justifyContent = 'center';
+        this.appElement.innerHTML = `
+            <div style="text-align: center; opacity: 0.8;">
+                <div style="font-size: 3rem; margin-bottom: 20px;">💈</div>
+                <div style="font-size: 1.2rem; letter-spacing: 2px;">BARBERGO</div>
+                <div style="font-size: 0.85rem; margin-top: 15px; color: #999;">
+                    جاري تحميل...
+                </div>
+            </div>
+        `;
     }
 
     ensureInitialDarkShell() {
@@ -118,28 +388,35 @@ class App {
         try {
             await this.init();
         } catch (error) {
-            console.error('Startup failed:', error);
+            console.error('[App] Startup failed:', error);
             this.renderSafeFallback();
         }
     }
 
     async waitForBootstrap() {
+        // Wait for database collections to be available
         const dbReady = new Promise(resolve => {
             if (window.db && window.db.barbers && window.db.services && window.db.bookings) {
                 return resolve();
             }
+            
+            let attempts = 0;
             const interval = setInterval(() => {
                 if (window.db && window.db.barbers && window.db.services && window.db.bookings) {
                     clearInterval(interval);
                     resolve();
                 }
+                attempts++;
+                if (attempts > 60) { // 3 seconds max
+                    clearInterval(interval);
+                    resolve(); // Continue anyway
+                }
             }, 50);
-            setTimeout(() => {
-                clearInterval(interval);
-                resolve();
-            }, 3000);
         });
+
         await dbReady;
+
+        // Also ensure auth is ready
         if (window.dbService && typeof window.dbService.ensureAuthReady === 'function') {
             try {
                 await Promise.race([
@@ -147,26 +424,31 @@ class App {
                     new Promise((_, reject) => setTimeout(() => reject(new Error('auth-init-timeout')), 5000))
                 ]);
             } catch (err) {
-                console.warn('Auth ready timed out or failed:', err);
+                console.warn('[App] Auth ready check timed out or failed:', err);
             }
         }
     }
 
     renderSafeFallback() {
         if (this.appElement) {
-            this.appElement.innerHTML = UI.renderLoadingPlaceholder('حدث خطأ. جاري إعادة المحاولة...');
+            this.appElement.innerHTML = window.UI 
+                ? window.UI.renderLoadingPlaceholder('حدث خطأ. جاري إعادة المحاولة...')
+                : '<div style="padding: 20px; text-align: center; color: #ccc;">Error occurred. Please refresh the page.</div>';
         }
     }
 
     async init() {
         await this.waitForBootstrap();
+
         // Full Real-App session detection
         const session = localStorage.getItem('barbergo_session');
 
         if (window.location.pathname.includes('admin.html')) {
             if (session === 'admin') {
                 this.navigate('adminDashboard');
-                window.notifier.show("مرحباً بك", "أهلاً بك مجدداً في لوحة تحكم الإدارة.", "success");
+                if (window.notifier) {
+                    window.notifier.show("مرحباً بك", "أهلاً بك مجدداً في لوحة تحكم الإدارة.", "success");
+                }
             } else {
                 this.navigate('adminLogin');
             }
@@ -177,15 +459,24 @@ class App {
             if (session.startsWith('barber_')) {
                 const bId = parseInt(session.split('_')[1]);
                 this.navigate('barberDashboard', { id: bId });
-                const foundBarber = window.db.barbers.find(b => b.id === bId);
-                const bName = foundBarber ? foundBarber.name : 'أيها الحلاق';
-                window.notifier.show("مرحباً بك", `أهلاً بك مجدداً في لوحة التحكم الخاصة بك يا ${bName}.`, "success");
-                // Check for subscription expiry window and notify if within 48 hours
-                try { this.checkBarberExpiryNotification(bId); } catch (e) { console.error(e); }
+                if (window.db && window.db.barbers) {
+                    const foundBarber = window.db.barbers.find(b => b.id === bId);
+                    const bName = foundBarber ? foundBarber.name : 'أيها الحلاق';
+                    if (window.notifier) {
+                        window.notifier.show("مرحباً بك", `أهلاً بك مجدداً في لوحة التحكم الخاصة بك يا ${bName}.`, "success");
+                    }
+                }
+                try {
+                    this.checkBarberExpiryNotification(bId);
+                } catch (e) {
+                    console.error('[App] Expiry notification check failed:', e);
+                }
                 return;
             } else if (session === 'client') {
                 this.navigate('clientHome');
-                window.notifier.show("مرحباً بك", "أهلاً بك مجدداً في BarberGo. احجز موعدك الآن!", "success");
+                if (window.notifier) {
+                    window.notifier.show("مرحباً بك", "أهلاً بك مجدداً في BarberGo. احجز موعدك الآن!", "success");
+                }
                 return;
             }
         }
@@ -196,7 +487,9 @@ class App {
 
     logout() {
         localStorage.removeItem('barbergo_session');
-        window.notifier.show("تسجيل خروج", "تم تسجيل الخروج بنجاح", "info");
+        if (window.notifier) {
+            window.notifier.show("تسجيل خروج", "تم تسجيل الخروج بنجاح", "info");
+        }
 
         if (window.location.pathname.includes('admin.html')) {
             this.navigate('adminLogin');
@@ -212,96 +505,135 @@ class App {
         if (document.body) {
             document.body.style.backgroundColor = '#000000';
         }
+
         this.currentView = view;
         this.currentParams = params;
 
         let html = '';
 
-        switch (view) {
-            case 'welcome':
-                html = UI.renderWelcome();
-                break;
-            case 'clientHome':
-                html = UI.renderClientHome();
-                break;
-            case 'clientSettings':
-                html = UI.renderClientSettings();
-                break;
-            case 'clientNotifications':
-                html = UI.renderClientNotifications();
-                break;
-            case 'clientBookings':
-                html = UI.renderClientBookings();
-                break;
-            case 'barberProfile':
-                html = UI.renderBarberProfile(params.id || 1);
-                break;
-            case 'bookingFlow':
-                html = UI.renderBookingFlow(params.barberId, params.serviceId);
-                break;
-            case 'aiCamera':
-                html = UI.renderAICamera();
-                break;
-            case 'barberLogin':
-                html = UI.renderBarberLogin();
-                break;
-            case 'barberEmailSetup':
-                html = UI.renderBarberEmailSetup();
-                break;
-            case 'barberDashboard':
-                html = this.renderLoadingPlaceholder();
-                this.appElement.innerHTML = html;
-                    try { await this.loadHeavyUI(); } catch (err) { console.warn('Heavy UI load failed:', err); }
-                html = UI.renderBarberDashboard(params.id || 1);
-                break;
-            case 'adminLogin':
-                html = UI.renderAdminLogin();
-                break;
-            case 'adminEmailSetup':
-                html = UI.renderAdminEmailSetup();
-                break;
-            case 'adminDashboard':
-                html = this.renderLoadingPlaceholder();
-                this.appElement.innerHTML = html;
-                try { await this.loadHeavyUI(); } catch (err) { console.warn('Heavy UI load failed:', err); }
-                html = UI.renderAdminDashboard();
-                setTimeout(() => { if (window.app) window.app.initAdminChart(); }, 100);
-                break;
-            default:
-                html = UI.renderWelcome();
+        // Safety check: UI library must be available
+        if (!window.UI || typeof window.UI !== 'object') {
+            this.appElement.innerHTML = '<div style="padding: 40px; text-align: center; color: #ccc;">UI library not loaded. Please refresh the page.</div>';
+            return;
         }
 
         try {
+            switch (view) {
+                case 'welcome':
+                    html = window.UI.renderWelcome();
+                    break;
+                case 'clientHome':
+                    html = window.UI.renderClientHome();
+                    break;
+                case 'clientSettings':
+                    html = window.UI.renderClientSettings();
+                    break;
+                case 'clientNotifications':
+                    html = window.UI.renderClientNotifications();
+                    break;
+                case 'clientBookings':
+                    html = window.UI.renderClientBookings();
+                    break;
+                case 'barberProfile':
+                    html = window.UI.renderBarberProfile(params.id || 1);
+                    break;
+                case 'bookingFlow':
+                    html = window.UI.renderBookingFlow(params.barberId, params.serviceId);
+                    break;
+                case 'aiCamera':
+                    html = window.UI.renderAICamera();
+                    break;
+                case 'barberLogin':
+                    html = window.UI.renderBarberLogin();
+                    break;
+                case 'barberEmailSetup':
+                    html = window.UI.renderBarberEmailSetup();
+                    break;
+                case 'barberDashboard':
+                    html = this.renderLoadingPlaceholder();
+                    this.appElement.innerHTML = html;
+                    try {
+                        await this.loadHeavyUI();
+                    } catch (err) {
+                        console.warn('[App] Heavy UI load failed:', err);
+                    }
+                    html = window.UI.renderBarberDashboard(params.id || 1);
+                    break;
+                case 'adminLogin':
+                    html = window.UI.renderAdminLogin();
+                    break;
+                case 'adminEmailSetup':
+                    html = window.UI.renderAdminEmailSetup();
+                    break;
+                case 'adminDashboard':
+                    html = this.renderLoadingPlaceholder();
+                    this.appElement.innerHTML = html;
+                    try {
+                        await this.loadHeavyUI();
+                    } catch (err) {
+                        console.warn('[App] Heavy UI load failed:', err);
+                    }
+                    html = window.UI.renderAdminDashboard();
+                    setTimeout(() => {
+                        if (window.app) window.app.initAdminChart();
+                    }, 100);
+                    break;
+                default:
+                    html = window.UI.renderWelcome();
+            }
+
             this.appElement.innerHTML = html;
+
         } catch (err) {
-            console.error('Render failed in navigate:', err);
+            console.error('[App] Render failed in navigate:', err);
             this.renderSafeFallback();
             return;
         }
+
         window.scrollTo(0, 0);
-        // If navigating to barber dashboard, run expiry notification check
+
+        // Check for barber expiry notifications
         if (view === 'barberDashboard' && params && params.id) {
-            try { this.checkBarberExpiryNotification(params.id); } catch (e) { console.error(e); }
+            try {
+                this.checkBarberExpiryNotification(params.id);
+            } catch (e) {
+                console.error('[App] Expiry notification check failed:', e);
+            }
         }
     }
 
     checkBarberExpiryNotification(barberId) {
+        if (!window.db || !window.db.barbers) return;
+        
         const barber = window.db.barbers.find(b => b.id === barberId);
         if (!barber) return;
+
         const expiryRaw = barber.subscriptionEndDate || barber.expiryDate || barber.subscriptionEnd || null;
         if (!expiryRaw) return;
+
         const expiry = new Date(expiryRaw);
         if (isNaN(expiry.getTime())) return;
+
         const remainingMs = expiry.getTime() - Date.now();
         const twoDaysMs = 48 * 60 * 60 * 1000;
+
         if (remainingMs <= twoDaysMs && remainingMs >= 0) {
             const hoursLeft = Math.ceil(remainingMs / (60 * 60 * 1000));
-            window.notifier && window.notifier.show && window.notifier.show('انتباه: انتهاء الاشتراك', `اشتراك صفحتك سينتهي خلال ${hoursLeft} ساعة. يرجى تجديده للحفاظ على ظهور الصالون للعملاء.`, 'info');
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show(
+                    'انتباه: انتهاء الاشتراك',
+                    `اشتراك صفحتك سينتهي خلال ${hoursLeft} ساعة. يرجى تجديده للحفاظ على ظهور الصالون للعملاء.`,
+                    'info'
+                );
+            }
         }
     }
 
     renderLoadingPlaceholder(message = 'جاري تحميل المحتوى...') {
-        return UI.renderLoadingPlaceholder(message);
+        if (window.UI && typeof window.UI.renderLoadingPlaceholder === 'function') {
+            return window.UI.renderLoadingPlaceholder(message);
+        }
+        return `<div style="padding: 40px; text-align: center; color: #ccc;">${message}</div>`;
     }
 
     async registerServiceWorker() {
@@ -309,29 +641,31 @@ class App {
         try {
             const registration = await navigator.serviceWorker.register(`/sw.js?v=${this.buildId}`, { scope: '/' });
             this.serviceWorkerRegistered = true;
-            console.info('Service Worker registered:', registration.scope);
+            console.info('[App] Service Worker registered:', registration.scope);
             if (registration && registration.update) {
                 registration.update().catch(() => {});
             }
         } catch (err) {
-            console.warn('Service Worker registration failed:', err);
+            console.warn('[App] Service Worker registration failed:', err);
         }
     }
 
     askPushNotificationsPermission() {
         if (!('Notification' in window) || Notification.permission !== 'default') return;
         if (localStorage.getItem('barbergo_push_prompt_shown') === 'true') return;
+
         localStorage.setItem('barbergo_push_prompt_shown', 'true');
+
         setTimeout(async () => {
             try {
                 const permission = await Notification.requestPermission();
-                if (permission === 'granted') {
-                    window.notifier && window.notifier.show && window.notifier.show('تم تفعيل الإشعارات', 'ستتلقى تذكيرات الحجز والتحديثات من BarberGo.', 'success');
-                } else if (permission === 'denied') {
-                    window.notifier && window.notifier.show && window.notifier.show('تم تعطيل الإشعارات', 'لن يتم إرسال تذكيرات الدفع والإشعارات الفورية.', 'info');
+                if (permission === 'granted' && window.notifier) {
+                    window.notifier.show('تم تفعيل الإشعارات', 'ستتلقى تذكيرات الحجز والتحديثات من BarberGo.', 'success');
+                } else if (permission === 'denied' && window.notifier) {
+                    window.notifier.show('تم تعطيل الإشعارات', 'لن يتم إرسال تذكيرات الدفع والإشعارات الفورية.', 'info');
                 }
             } catch (err) {
-                console.warn('Push notification permission prompt failed:', err);
+                console.warn('[App] Push notification permission prompt failed:', err);
             }
         }, 1300);
     }
@@ -339,11 +673,25 @@ class App {
     // Interactions & Routing Helpers
     async loadHeavyUI() {
         if (!this.heavyUILoadPromise) {
-            this.heavyUILoadPromise = import('./ui-heavy-routes.js')
-                .catch(err => {
-                    console.error('Heavy UI failed to load:', err);
-                    throw err;
+            // Check if ui-heavy-routes is already loaded
+            if (window.UI && window.UI.renderBarberDashboard) {
+                this.heavyUILoadPromise = Promise.resolve();
+            } else {
+                // Load ui-heavy-routes as a regular script
+                this.heavyUILoadPromise = new Promise((resolve, reject) => {
+                    const script = document.createElement('script');
+                    script.src = './ui-heavy-routes.js?t=' + Date.now();
+                    script.onload = () => {
+                        console.info('[App] Heavy UI routes loaded successfully');
+                        resolve();
+                    };
+                    script.onerror = (err) => {
+                        console.error('[App] Heavy UI routes failed to load:', err);
+                        resolve(); // Don't fail completely, continue anyway
+                    };
+                    document.head.appendChild(script);
                 });
+            }
         }
         return this.heavyUILoadPromise;
     }
@@ -353,8 +701,11 @@ class App {
         localStorage.setItem('barbergo_lang', this.language);
         document.documentElement.dir = this.language === 'ar' ? 'rtl' : 'ltr';
         document.documentElement.lang = this.language;
+        
         const msg = this.language === 'ar' ? 'تم تحويل اللغة إلى العربية' : 'Language switched to English';
-        window.notifier.show("تغيير اللغة", msg, "success");
+        if (window.notifier && typeof window.notifier.show === 'function') {
+            window.notifier.show("تغيير اللغة", msg, "success");
+        }
         this.navigate(this.currentView, this.currentParams);
     }
 
@@ -372,30 +723,37 @@ class App {
             if (!waiting) {
                 fn(...args);
                 waiting = true;
-                setTimeout(() => waiting = false, limit);
+                setTimeout(() => (waiting = false), limit);
             }
         };
     }
 
     filterBarbers() {
-        const query = document.getElementById('client-search-input').value.toLowerCase();
+        const query = document.getElementById('client-search-input');
+        if (!query) return;
+        
+        const queryText = query.value.toLowerCase();
         const barberCards = document.querySelectorAll('.barber-grid-card');
+        
         window.requestAnimationFrame(() => {
             barberCards.forEach(card => {
-                const name = card.querySelector('h3').innerText.toLowerCase();
-                card.style.display = name.includes(query) ? 'block' : 'none';
+                const nameEl = card.querySelector('h3');
+                const name = nameEl ? nameEl.innerText.toLowerCase() : '';
+                card.style.display = name.includes(queryText) ? 'block' : 'none';
             });
         });
     }
 
     requestLocation() {
-        window.notifier.show("تحديد الموقع", "تم تحديد موقعك الجغرافي بنجاح. يتم الآن عرض أقرب الحلاقين إليك.", "success");
+        if (window.notifier && typeof window.notifier.show === 'function') {
+            window.notifier.show("تحديد الموقع", "تم تحديد موقعك الجغرافي بنجاح. يتم الآن عرض أقرب الحلاقين إليك.", "success");
+        }
     }
 
     openNotifications() {
         this.navigate('clientNotifications');
         const customerName = localStorage.getItem('barbergo_client_name');
-        if (!customerName) {
+        if (!customerName && window.notifier && typeof window.notifier.show === 'function') {
             window.notifier.show("تنبيه", "لم يتم العثور على اسم العميل. قم بالحجز أولاً لتلقي إشعارات التقييم.", "info");
         }
     }
@@ -403,6 +761,9 @@ class App {
     submitFeedback(barberId, notificationId) {
         const slider = document.getElementById(`feedback-slider-${notificationId}`);
         const value = slider ? parseInt(slider.value, 10) : 0;
+        
+        if (!window.db || !window.db.notifications) return;
+        
         const notification = window.db.notifications.find(n => n.id === notificationId);
         if (!notification) return;
 
@@ -420,29 +781,58 @@ class App {
         notification.submitted = true;
         notification.ratingPercentage = value;
         notification.submittedAt = new Date().toISOString();
-        window.saveDB();
+        
+        if (window.saveDB && typeof window.saveDB === 'function') {
+            window.saveDB();
+        }
 
-        window.notifier.show("تم الإرسال", `تم إرسال تقييمك لكابتن ${notification.barberName} بنجاح. شكراً لمشاركتك رأيك.`, "success");
+        if (window.notifier && typeof window.notifier.show === 'function') {
+            window.notifier.show(
+                "تم الإرسال",
+                `تم إرسال تقييمك لكابتن ${notification.barberName} بنجاح. شكراً لمشاركتك رأيك.`,
+                "success"
+            );
+        }
+        
         this.navigate('clientNotifications');
     }
 
     archiveNotification(notificationId) {
+        if (!window.db || !window.db.notifications) return;
+        
         const notification = window.db.notifications.find(n => n.id === notificationId);
         if (!notification) return;
 
         notification.archived = true;
-        window.saveDB();
-        window.notifier.show("تم الإغلاق", "تم إغلاق الإشعار ولن يتم عرضه مجدداً.", "info");
+        
+        if (window.saveDB && typeof window.saveDB === 'function') {
+            window.saveDB();
+        }
+        
+        if (window.notifier && typeof window.notifier.show === 'function') {
+            window.notifier.show("تم الإغلاق", "تم إغلاق الإشعار ولن يتم عرضه مجدداً.", "info");
+        }
+        
         this.navigate('clientNotifications');
     }
 
     toggleFavorite(id) {
+        if (!window.db || !window.db.barbers) return;
+        
         const barber = window.db.barbers.find(b => b.id === id);
         if (barber) {
             barber.isFavorite = !barber.isFavorite;
             const msg = barber.isFavorite ? "تم إضافة الحلاق إلى مفضلتك." : "تم إزالة الحلاق من مفضلتك.";
             const type = barber.isFavorite ? "success" : "info";
-            window.notifier.show("المفضلة", msg, type);
+            
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show("المفضلة", msg, type);
+            }
+            
+            if (window.saveDB && typeof window.saveDB === 'function') {
+                window.saveDB();
+            }
+            
             // Re-render home to sort favorites
             if (this.currentView === 'clientHome') {
                 this.navigate('clientHome');
@@ -470,10 +860,14 @@ class App {
 
     submitReview(barberId) {
         if (!this.pendingRating) {
-            window.notifier.show("خطأ", "يرجى اختيار عدد النجوم للتقييم.", "error");
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show("خطأ", "يرجى اختيار عدد النجوم للتقييم.", "error");
+            }
             return;
         }
 
+        if (!window.db || !window.db.barbers) return;
+        
         const barber = window.db.barbers.find(b => b.id === barberId);
         if (barber) {
             // Update rating logic
@@ -484,7 +878,9 @@ class App {
             barber.rating = parseFloat(newAvg.toFixed(1));
             barber.reviewsCount = newCount;
             
-            window.saveDB();
+            if (window.saveDB && typeof window.saveDB === 'function') {
+                window.saveDB();
+            }
             
             // Update UI
             const ratingDisplay = document.getElementById('barber-avg-rating');
@@ -493,10 +889,13 @@ class App {
             if (ratingDisplay) ratingDisplay.innerText = barber.rating;
             if (reviewsCountDisplay) reviewsCountDisplay.innerText = `بناءً على ${barber.reviewsCount} تقييم`;
             
-            window.notifier.show("إرسال التقييم", "تم تسجيل تقييمك بنجاح! شكراً لك.", "success");
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show("إرسال التقييم", "تم تسجيل تقييمك بنجاح! شكراً لك.", "success");
+            }
+            
             this.pendingRating = 0;
             
-            // Optional: reset stars visually
+            // Reset stars visually
             const stars = document.querySelectorAll('#barber-rating i');
             stars.forEach(star => {
                 star.classList.remove('fa-solid');
@@ -508,8 +907,12 @@ class App {
     toggleBarberSettingParam(btn, param) {
         const barberIdStr = localStorage.getItem('barbergo_session');
         if (!barberIdStr) return;
+        
+        if (!window.db || !window.db.barbers) return;
+        
         const barberId = parseInt(barberIdStr.split('_')[1]);
         const barber = window.db.barbers.find(b => b.id === barberId);
+        
         if (barber) {
             if (param === 'homeService') {
                 barber.homeService = !barber.homeService;
@@ -539,7 +942,10 @@ class App {
                     btn.innerText = 'معطل';
                 }
             }
-            window.saveDB();
+            
+            if (window.saveDB && typeof window.saveDB === 'function') {
+                window.saveDB();
+            }
         }
     }
 
@@ -556,6 +962,9 @@ class App {
         
         const barberIdStr = localStorage.getItem('barbergo_session');
         if (!barberIdStr) return;
+        
+        if (!window.db || !window.db.barbers) return;
+        
         const barberId = parseInt(barberIdStr.split('_')[1]);
         const barber = window.db.barbers.find(b => b.id === barberId);
         
@@ -566,18 +975,27 @@ class App {
             if (!barber.social) barber.social = {};
             if (whatsapp) barber.social.whatsapp = whatsapp;
             
-            window.saveDB();
-            window.notifier.show("تم الحفظ", "تم حفظ إعدادات البروفايل بنجاح، وستظهر للعملاء بشكلها الجديد.", "success");
+            if (window.saveDB && typeof window.saveDB === 'function') {
+                window.saveDB();
+            }
+            
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show("تم الحفظ", "تم حفظ إعدادات البروفايل بنجاح، وستظهر للعملاء بشكلها الجديد.", "success");
+            }
         }
     }
 
     simulateAddService() {
         const barberIdStr = localStorage.getItem('barbergo_session');
         if (!barberIdStr || !barberIdStr.startsWith('barber_')) return;
+        
+        if (!window.db || !window.db.services) return;
+        
         const barberId = parseInt(barberIdStr.split('_')[1]);
 
         const name = prompt("أدخل اسم الخدمة الجديدة:");
         const price = prompt("أدخل سعر الخدمة (بالدينار):");
+        
         if (name && price) {
             const newSvc = {
                 id: Date.now(),
@@ -586,8 +1004,12 @@ class App {
                 price: parseFloat(price),
                 duration: 30
             };
+            
             window.db.services.push(newSvc);
-            window.saveDB();
+            
+            if (window.saveDB && typeof window.saveDB === 'function') {
+                window.saveDB();
+            }
 
             const container = document.getElementById('services-list-container');
             if (container) {
@@ -601,7 +1023,10 @@ class App {
                 </div>`;
                 container.innerHTML += html;
             }
-            window.notifier.show("تمت الإضافة", `تمت إضافة خدمة ${name} بقيمة ${price} JOD بنجاح. ستظهر الآن للعملاء.`, "success");
+            
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show("تمت الإضافة", `تمت إضافة خدمة ${name} بقيمة ${price} JOD بنجاح. ستظهر الآن للعملاء.`, "success");
+            }
         }
     }
 
@@ -609,36 +1034,52 @@ class App {
         const confirmDel = confirm("هل أنت متأكد من حذف هذه الخدمة؟");
         if (!confirmDel) return;
 
+        if (!window.db || !window.db.services) return;
+
         const svc = window.db.services.find(s => s.id === serviceId);
         if (!svc) {
-            window.notifier.show('خطأ', 'لم يتم العثور على الخدمة للحذف.', 'error');
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show('خطأ', 'لم يتم العثور على الخدمة للحذف.', 'error');
+            }
             return;
         }
 
         // Optimistic UI update: remove locally first for immediate UX
         try {
             window.db.services = window.db.services.filter(s => s.id !== serviceId);
-            window.saveDB && window.saveDB();
+            
+            if (window.saveDB && typeof window.saveDB === 'function') {
+                window.saveDB();
+            }
+            
             if (btnEl) btnEl.closest('.pill-box').remove();
         } catch (err) {
-            console.error('Local delete error', err);
+            console.error('[App] Local delete error', err);
         }
 
         // Call backend removal: prefer arrayRemove from barber document
         if (window.dbService && typeof window.dbService.removeServiceFromBarber === 'function') {
             window.dbService.removeServiceFromBarber(svc.barber_id, svc).then(() => {
-                window.notifier.show('حذف الخدمة', 'تم حذف الخدمة من السجل بنجاح.', 'info');
+                if (window.notifier && typeof window.notifier.show === 'function') {
+                    window.notifier.show('حذف الخدمة', 'تم حذف الخدمة من السجل بنجاح.', 'info');
+                }
             }).catch(err => {
-                console.error(err);
-                window.notifier.show('خطأ', 'فشل حذف الخدمة من الخادم. تحقق من الاتصال.', 'error');
+                console.error('[App] Delete service error:', err);
+                if (window.notifier && typeof window.notifier.show === 'function') {
+                    window.notifier.show('خطأ', 'فشل حذف الخدمة من الخادم. تحقق من الاتصال.', 'error');
+                }
             });
         } else if (window.dbService && typeof window.dbService.deleteService === 'function') {
             // Fallback to deleting service doc if arrayRemove not available
             window.dbService.deleteService(serviceId).then(() => {
-                window.notifier.show('حذف الخدمة', 'تم حذف الخدمة من السجل بنجاح.', 'info');
+                if (window.notifier && typeof window.notifier.show === 'function') {
+                    window.notifier.show('حذف الخدمة', 'تم حذف الخدمة من السجل بنجاح.', 'info');
+                }
             }).catch(err => {
-                console.error(err);
-                window.notifier.show('خطأ', 'فشل حذف الخدمة من الخادم.', 'error');
+                console.error('[App] Delete service error:', err);
+                if (window.notifier && typeof window.notifier.show === 'function') {
+                    window.notifier.show('خطأ', 'فشل حذف الخدمة من الخادم.', 'error');
+                }
             });
         }
     }
@@ -651,8 +1092,11 @@ class App {
     }
 
     startEditService(serviceId, btnEl) {
+        if (!window.db || !window.db.services) return;
+        
         const svc = window.db.services.find(s => s.id === serviceId);
         if (!svc) return;
+        
         const container = document.getElementById('svc-' + serviceId);
         if (!container) return;
 
@@ -672,36 +1116,53 @@ class App {
         const nameEl = document.getElementById('edit-name-' + serviceId);
         const priceEl = document.getElementById('edit-price-' + serviceId);
         if (!nameEl || !priceEl) return;
+        
         const newName = nameEl.value.trim();
         const newPrice = parseFloat(priceEl.value);
+        
         if (!newName || isNaN(newPrice)) {
-            window.notifier.show('خطأ', 'يرجى إدخال اسم صحيح وسعر رقمي.', 'error');
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show('خطأ', 'يرجى إدخال اسم صحيح وسعر رقمي.', 'error');
+            }
             return;
         }
+
+        if (!window.db || !window.db.services) return;
 
         // Optimistically update local DB for snappy UI
         const svc = window.db.services.find(s => s.id === serviceId);
         if (svc) {
             svc.name = newName;
             svc.price = newPrice;
-            window.saveDB && window.saveDB();
+            
+            if (window.saveDB && typeof window.saveDB === 'function') {
+                window.saveDB();
+            }
         }
 
         try {
             if (window.dbService && typeof window.dbService.updateService === 'function') {
                 await window.dbService.updateService(serviceId, { name: newName, price: newPrice });
             }
-            window.notifier.show('تم الحفظ', 'تم تحديث بيانات الخدمة بنجاح.', 'success');
+            
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show('تم الحفظ', 'تم تحديث بيانات الخدمة بنجاح.', 'success');
+            }
+            
             // Refresh view to show updated service
             this.navigate('barberDashboard', { id: svc.barber_id });
         } catch (err) {
-            console.error(err);
-            window.notifier.show('خطأ', 'فشل تحديث الخدمة. حاول مجدداً.', 'error');
+            console.error('[App] Save service edit error:', err);
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show('خطأ', 'فشل تحديث الخدمة. حاول مجدداً.', 'error');
+            }
         }
     }
 
     // Product pre-order toggling on client product cards
     togglePreOrderProduct(productId, btnEl) {
+        if (!window.db || !window.db.products) return;
+        
         const prod = window.db.products.find(p => p.id === productId);
         if (!prod) return;
 
@@ -710,25 +1171,38 @@ class App {
             // remove
             this.pendingPreOrderProducts.splice(idx, 1);
             if (btnEl) btnEl.innerText = 'إضافه للطلب والتحضير';
-            window.notifier.show('تمت الإزالة', `${prod.name} تمت إزالته من قائمة التحضير.`, 'info');
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show('تمت الإزالة', `${prod.name} تمت إزالته من قائمة التحضير.`, 'info');
+            }
         } else {
             this.pendingPreOrderProducts.push({ productId: productId, productName: prod.name, quantity: 1 });
             if (btnEl) btnEl.innerText = 'تمت الإضافة';
-            window.notifier.show('تمت الإضافة', `${prod.name} أضيف لطلب التحضير عند الحضور.`, 'success');
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show('تمت الإضافة', `${prod.name} أضيف لطلب التحضير عند الحضور.`, 'success');
+            }
         }
     }
 
     updateSubscriptionPrice() {
+        if (!window.db || !window.db.adminSettings) return;
+        
         const adminData = window.db.adminSettings;
         const inputs = document.querySelectorAll('#admin-content-3 input[type="number"]');
         if (inputs.length >= 2) {
             const monthly = parseInt(inputs[0].value);
             const yearly = parseInt(inputs[1].value);
             if (!isNaN(monthly) && !isNaN(yearly)) {
+                adminData.subscriptionPrices = adminData.subscriptionPrices || {};
                 adminData.subscriptionPrices.monthly = monthly;
                 adminData.subscriptionPrices.yearly = yearly;
-                window.saveDB();
-                window.notifier.show("تحديث التسعير", "تم حفظ أسعار الاشتراكات الجديدة وتحديثها في قاعدة البيانات.", "success");
+                
+                if (window.saveDB && typeof window.saveDB === 'function') {
+                    window.saveDB();
+                }
+                
+                if (window.notifier && typeof window.notifier.show === 'function') {
+                    window.notifier.show("تحديث التسعير", "تم حفظ أسعار الاشتراكات الجديدة وتحديثها في قاعدة البيانات.", "success");
+                }
             }
         }
     }
@@ -738,19 +1212,26 @@ class App {
         const priceInput = document.getElementById('new-product-price');
         const imageInput = document.getElementById('new-product-image');
 
-        const name = nameInput.value.trim();
-        const price = priceInput.value.trim();
-        const file = imageInput.files[0];
+        const name = nameInput ? nameInput.value.trim() : '';
+        const price = priceInput ? priceInput.value.trim() : '';
+        const file = imageInput ? imageInput.files[0] : null;
 
         if (!name || !price || !file) {
-            window.notifier.show("بيانات غير مكتملة", "يرجى إدخال اسم المنتج والسعر واختيار صورة.", "warning");
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show("بيانات غير مكتملة", "يرجى إدخال اسم المنتج والسعر واختيار صورة.", "warning");
+            }
             return;
         }
 
+        if (!window.db || !window.db.products) return;
+
         const reader = new FileReader();
-        reader.onload = function (e) {
+        reader.onload = (e) => {
             const base64Image = e.target.result;
-            const barberId = parseInt(localStorage.getItem('barbergo_session').split('_')[1]);
+            const barberIdStr = localStorage.getItem('barbergo_session');
+            if (!barberIdStr) return;
+            
+            const barberId = parseInt(barberIdStr.split('_')[1]);
 
             const newProduct = {
                 id: Date.now(),
@@ -760,8 +1241,11 @@ class App {
                 image: base64Image
             };
 
-            db.products.push(newProduct);
-            window.saveDB();
+            window.db.products.push(newProduct);
+            
+            if (window.saveDB && typeof window.saveDB === 'function') {
+                window.saveDB();
+            }
 
             const container = document.getElementById('store-products-list');
             if (container) {
@@ -774,12 +1258,15 @@ class App {
                 </div>`;
                 container.innerHTML += html;
             }
-            window.notifier.show("تمت الإضافة", `تم إضافة ${newProduct.name} إلى المتجر وتم عرضه للعملاء بنجاح.`, "success");
+            
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show("تمت الإضافة", `تم إضافة ${newProduct.name} إلى المتجر وتم عرضه للعملاء بنجاح.`, "success");
+            }
 
             // Clean up
-            nameInput.value = '';
-            priceInput.value = '';
-            imageInput.value = '';
+            if (nameInput) nameInput.value = '';
+            if (priceInput) priceInput.value = '';
+            if (imageInput) imageInput.value = '';
         };
         reader.readAsDataURL(file);
     }
@@ -788,18 +1275,29 @@ class App {
         const file = event.target.files[0];
         if (!file) return;
 
+        if (!window.db) return;
+
         const reader = new FileReader();
-        reader.onload = function (e) {
+        reader.onload = (e) => {
             const base64Image = e.target.result;
-            const barberId = parseInt(localStorage.getItem('barbergo_session').split('_')[1]);
-            const barber = db.barbers.find(b => b.id === barberId);
+            const barberIdStr = localStorage.getItem('barbergo_session');
+            if (!barberIdStr) return;
+            
+            const barberId = parseInt(barberIdStr.split('_')[1]);
+            const barber = window.db.barbers ? window.db.barbers.find(b => b.id === barberId) : null;
 
             if (!barber) return;
 
             if (type === 'cover') {
                 barber.image = base64Image; // save as cover
-                window.saveDB();
-                window.notifier.show("تم الرفع", "تم رفع صورة الغلاف بنجاح ومزامنتها.", "success");
+                
+                if (window.saveDB && typeof window.saveDB === 'function') {
+                    window.saveDB();
+                }
+                
+                if (window.notifier && typeof window.notifier.show === 'function') {
+                    window.notifier.show("تم الرفع", "تم رفع صورة الغلاف بنجاح ومزامنتها.", "success");
+                }
 
                 const statusDiv = document.getElementById('cover-upload-status');
                 if (statusDiv) statusDiv.innerHTML = '<span class="text-success"><i class="fa-solid fa-check"></i> تم رفع الصورة وجاهزة للحفظ</span>';
@@ -807,7 +1305,10 @@ class App {
             } else if (type === 'gallery') {
                 if (!barber.gallery) barber.gallery = [];
                 barber.gallery.push(base64Image);
-                window.saveDB();
+                
+                if (window.saveDB && typeof window.saveDB === 'function') {
+                    window.saveDB();
+                }
 
                 const container = document.getElementById('gallery-images-list');
                 if (container) {
@@ -818,7 +1319,10 @@ class App {
                     </div>`;
                     container.innerHTML += html;
                 }
-                window.notifier.show("تم الرفع", "تم إضافة الصورة بنجاح إلى معرض أعمالك المحفوظ.", "success");
+                
+                if (window.notifier && typeof window.notifier.show === 'function') {
+                    window.notifier.show("تم الرفع", "تم إضافة الصورة بنجاح إلى معرض أعمالك المحفوظ.", "success");
+                }
             }
             // Clear input
             event.target.value = '';
@@ -845,14 +1349,24 @@ class App {
     saveBlockedTimes() {
         const barberIdStr = localStorage.getItem('barbergo_session');
         if (!barberIdStr) return;
+        
+        if (!window.db || !window.db.barbers) return;
+        
         const barberId = parseInt(barberIdStr.split('_')[1]);
         const barber = window.db.barbers.find(b => b.id === barberId);
+        
         if (barber) {
             const blockedSlotsElements = document.querySelectorAll('#barber-block-grid .blocked-slot');
             const blockedTimes = Array.from(blockedSlotsElements).map(el => el.textContent.trim());
             barber.blockedTimes = blockedTimes;
-            window.saveDB();
-            window.notifier.show('تم الحفظ', 'تم حفظ الأوقات المقفلة بنجاح. لن يتمكن العملاء من حجز هذه الأوقات.', 'success');
+            
+            if (window.saveDB && typeof window.saveDB === 'function') {
+                window.saveDB();
+            }
+            
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show('تم الحفظ', 'تم حفظ الأوقات المقفلة بنجاح. لن يتمكن العملاء من حجز هذه الأوقات.', 'success');
+            }
         }
     }
 
@@ -860,7 +1374,9 @@ class App {
         // legacy method, kept for reference
         const reason = prompt("إلغاء حجز! تنويه: سيتم حفظ الإلغاء. الرجاء كتابة سبب الإلغاء للعميل:");
         if (reason) {
-            window.notifier.show("تم الإلغاء", `تم إلغاء الحجز للعميل بالسبب: ${reason}`, "info");
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show("تم الإلغاء", `تم إلغاء الحجز للعميل بالسبب: ${reason}`, "info");
+            }
         }
     }
 
@@ -884,11 +1400,16 @@ class App {
                 btn.innerHTML = '<i class="fa-solid fa-rotate-left"></i> تراجع عن الإلغاء';
                 
                 // Show simulated notification to client
-                const barberName = window.db.barbers.find(b => b.id === parseInt(localStorage.getItem('barbergo_session').split('_')[1]))?.name || "الحلاق";
-                window.notifier.show("تم إرسال الاعتذار للعميل", `نعتذر منك بشدة.. نود إعلامك بأن موعدك لدى ${barberName} قد تم إلغاؤه لظرف طارئ خارج عن إرادتنا. نحن نهتم بوقتك، بإمكانك إعادة الحجز في وقت آخر يناسبك. شكراً لتفهمك - فريق BarberGo.`, "info");
-                
-                // In real app, we'd find the booking ID and set status = 'cancelled' and saveDB()
-                // window.saveDB();
+                if (window.db && window.db.barbers) {
+                    const barberIdStr = localStorage.getItem('barbergo_session');
+                    const barberId = barberIdStr ? parseInt(barberIdStr.split('_')[1]) : null;
+                    const barber = barberId ? window.db.barbers.find(b => b.id === barberId) : null;
+                    const barberName = barber ? barber.name : "الحلاق";
+                    
+                    if (window.notifier && typeof window.notifier.show === 'function') {
+                        window.notifier.show("تم إرسال الاعتذار للعميل", `نعتذر منك بشدة.. نود إعلامك بأن موعدك لدى ${barberName} قد تم إلغاؤه لظرف طارئ خارج عن إرادتنا. نحن نهتم بوقتك، بإمكانك إعادة الحجز في وقت آخر يناسبك. شكراً لتفهمك - فريق BarberGo.`, "info");
+                    }
+                }
             }
         } else {
             // Undo Cancel
@@ -904,16 +1425,17 @@ class App {
             btn.style.border = '1px solid rgba(231, 76, 60, 0.3)';
             btn.innerHTML = 'إلغاء الحجز وإرسال تنبيه للعميل';
             
-            window.notifier.show("تم استعادة الحجز", `تم استعادة حجز العميل (${clientName}) بنجاح. تم إعلامه بتأكيد الموعد.`, "success");
-            
-            // In real app, we'd find the booking ID and set status = 'active' and saveDB()
-            // window.saveDB();
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show("تم استعادة الحجز", `تم استعادة حجز العميل (${clientName}) بنجاح. تم إعلامه بتأكيد الموعد.`, "success");
+            }
         }
     }
 
     cancelClientBooking(bookingId) {
         // Implement the 1-hour cancellation policy
-        const booking = db.bookings.find(b => b.id === bookingId);
+        if (!window.db || !window.db.bookings) return;
+        
+        const booking = window.db.bookings.find(b => b.id === bookingId);
         if (!booking) return;
 
         // In a real app we parse booking.time, but here we simulate a time check:
@@ -921,12 +1443,20 @@ class App {
         const confirmed = confirm("هل أنت متأكد من رغبتك بإلغاء الموعد؟ يمكنك الإلغاء فقط إذا كان متبقياً أكثر من ساعة للموعد.");
         if (confirmed) {
             booking.status = 'cancelled';
-            window.saveDB();
-            window.notifier.show("تأكيد الإلغاء", "تم إلغاء الموعد بنجاح. نعتذر لسماع ذلك ونأمل رؤيتك قريباً.", "success");
+            
+            if (window.saveDB && typeof window.saveDB === 'function') {
+                window.saveDB();
+            }
+            
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show("تأكيد الإلغاء", "تم إلغاء الموعد بنجاح. نعتذر لسماع ذلك ونأمل رؤيتك قريباً.", "success");
+            }
             
             // محاكاة إشعار للعملاء المهتمين والحلاق بتوفر الوقت
             setTimeout(() => {
-                window.notifier.show("إشعار توفر وقت 🔔", `لقد أصبح الوقت (${booking.time}) متاحاً الآن للحجز!`, "info");
+                if (window.notifier && typeof window.notifier.show === 'function') {
+                    window.notifier.show("إشعار توفر وقت 🔔", `لقد أصبح الوقت (${booking.time}) متاحاً الآن للحجز!`, "info");
+                }
             }, 2000);
 
             this.navigate('clientBookings');
@@ -941,15 +1471,21 @@ class App {
     }
 
     async confirmBooking() {
-        const name = document.getElementById('customer-name').value;
+        const nameEl = document.getElementById('customer-name');
         const selectedSlot = document.querySelector('.time-slot.selected');
 
+        const name = nameEl ? nameEl.value : '';
+
         if (!name || !name.trim()) {
-            window.notifier.show("خطأ", "الرجاء إدخال الاسم الثنائي.", "error");
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show("خطأ", "الرجاء إدخال الاسم الثنائي.", "error");
+            }
             return;
         }
         if (!selectedSlot) {
-            window.notifier.show("تنبيه", "الرجاء اختيار وقت متاح.", "warning");
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show("تنبيه", "الرجاء اختيار وقت متاح.", "warning");
+            }
             return;
         }
 
@@ -957,14 +1493,25 @@ class App {
 
         const bId = this.currentParams.barberId || this.currentParams.id;
         const preOrders = (this.pendingPreOrderProducts || []).map(p => ({ productName: p.productName, quantity: p.quantity || 1 }));
-        await window.dbService.bookAppointment({
-            customer_name: name,
-            time: timeStr,
-            date: new Date().toISOString(),
-            barber_id: bId,
-            service_id: this.currentParams.serviceId,
-            preOrderProducts: preOrders
-        });
+        
+        try {
+            if (window.dbService && typeof window.dbService.bookAppointment === 'function') {
+                await window.dbService.bookAppointment({
+                    customer_name: name,
+                    time: timeStr,
+                    date: new Date().toISOString(),
+                    barber_id: bId,
+                    service_id: this.currentParams.serviceId,
+                    preOrderProducts: preOrders
+                });
+            }
+        } catch (err) {
+            console.error('[App] Booking appointment error:', err);
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show("خطأ في الحجز", "حدث خطأ أثناء حفظ الحجز. يرجى المحاولة مرة أخرى.", "error");
+            }
+            return;
+        }
 
         // clear pending selections after booking
         this.pendingPreOrderProducts = [];
@@ -973,18 +1520,24 @@ class App {
         localStorage.setItem('barbergo_client_name', name);
 
         // Instant Booking Notification
-        window.notifier.notifyBookingConfirmed(name, timeStr);
+        if (window.notifier && typeof window.notifier.notifyBookingConfirmed === 'function') {
+            window.notifier.notifyBookingConfirmed(name, timeStr);
+        }
 
         // Smart 30-min Reminder Simulation
         setTimeout(() => {
-            if (window.notifier) window.notifier.notifySmartReminder(name);
+            if (window.notifier && typeof window.notifier.notifySmartReminder === 'function') {
+                window.notifier.notifySmartReminder(name);
+            }
         }, 5000);
 
         this.navigate('barberProfile', { id: this.currentParams.barberId });
     }
 
     triggerEmergency() {
-        window.notifier.show("حالة طارئة 🚨", "تم إرسال طلب حجز طارئ للحلاق. يرجى الانتظار للموافقة الفورية.", "error", true);
+        if (window.notifier && typeof window.notifier.show === 'function') {
+            window.notifier.show("حالة طارئة 🚨", "تم إرسال طلب حجز طارئ للحلاق. يرجى الانتظار للموافقة الفورية.", "error", true);
+        }
     }
 
     // Tab switchers
@@ -1019,51 +1572,52 @@ class App {
     }
 
     simulateNotification() {
-        window.notifier.show("إشعار تجريبي", "الإشعارات اللحظية تعمل بنجاح.", "info", true);
+        if (window.notifier && typeof window.notifier.show === 'function') {
+            window.notifier.show("إشعار تجريبي", "الإشعارات اللحظية تعمل بنجاح.", "info", true);
+        }
     }
 
     simulateNotificationError(msg) {
-        window.notifier.show("تنبيه", msg, "error");
-    }
-
-    rateBarber(rating, element) {
-        const stars = element.parentElement.children;
-        for (let i = 0; i < stars.length; i++) {
-            if (i < rating) {
-                stars[i].classList.remove('fa-regular');
-                stars[i].classList.add('fa-solid');
-            } else {
-                stars[i].classList.remove('fa-solid');
-                stars[i].classList.add('fa-regular');
-            }
+        if (window.notifier && typeof window.notifier.show === 'function') {
+            window.notifier.show("تنبيه", msg, "error");
         }
     }
 
     toggleSetting(settingName) {
-        window.notifier.show("تحديث الإعدادات", `تم بنجاح تغيير حالة: ${settingName}`, "success");
+        if (window.notifier && typeof window.notifier.show === 'function') {
+            window.notifier.show("تحديث الإعدادات", `تم بنجاح تغيير حالة: ${settingName}`, "success");
+        }
     }
 
     // Admin Auth
     verifyAdmin() {
-        const pass = document.getElementById('admin-password').value;
+        const passEl = document.getElementById('admin-password');
+        const pass = passEl ? passEl.value : '';
+        
         if (!pass || pass.trim() === '') {
-            window.notifier.show("خطأ", "يرجى إدخال كلمة المرور", "error");
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show("خطأ", "يرجى إدخال كلمة المرور", "error");
+            }
             return;
         }
         
         if (pass === 'mahmoud2005') {
             this.navigate('adminEmailSetup');
         } else {
-            window.notifier.show("خطأ", "كلمة المرور غير صحيحة", "error");
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show("خطأ", "كلمة المرور غير صحيحة", "error");
+            }
         }
     }
 
     verifyAdminEmail() {
         const emailInput = document.getElementById('admin-email');
-        const email = emailInput ? emailInput.value : 'admin';
+        const email = emailInput ? emailInput.value : '';
         
         if (!email || email.trim() === '') {
-            window.notifier.show("خطأ", "يرجى إدخال بريد إلكتروني صحيح", "warning");
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show("خطأ", "يرجى إدخال بريد إلكتروني صحيح", "warning");
+            }
             return;
         }
         
@@ -1080,7 +1634,9 @@ class App {
                 btn.disabled = false;
                 btn.innerText = 'دخول للوحة التحكم';
             }
-            window.notifier.show("خطأ", "انتهت مهلة الانتظار. يرجى محاولة مرة أخرى.", "error");
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show("خطأ", "انتهت مهلة الانتظار. يرجى محاولة مرة أخرى.", "error");
+            }
         }, 5000);
 
         try {
@@ -1100,8 +1656,10 @@ class App {
                 btn.disabled = false;
                 btn.innerText = 'دخول للوحة التحكم';
             }
-            window.notifier.show("خطأ", "حدث خطأ أثناء تسجيل الدخول", "error");
-            console.error('Admin email verification error:', err);
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show("خطأ", "حدث خطأ أثناء تسجيل الدخول", "error");
+            }
+            console.error('[App] Admin email verification error:', err);
         }
     }
 
@@ -1110,14 +1668,18 @@ class App {
         const code = codeInput ? codeInput.value : '';
         
         if (!code || code.trim() === '') {
-            window.notifier.show("خطأ", "يرجى إدخال رمز الدخول", "error");
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show("خطأ", "يرجى إدخال رمز الدخول", "error");
+            }
             return;
         }
         
         if (code === '0000') {
             this.navigate('barberEmailSetup');
         } else {
-            window.notifier.show("خطأ", "رمز الدخول غير صحيح", "error");
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show("خطأ", "رمز الدخول غير صحيح", "error");
+            }
         }
     }
 
@@ -1126,7 +1688,9 @@ class App {
         const email = passedEmail || (emailInput ? emailInput.value : 'google_auth');
 
         if (!email || email.trim() === '') {
-            window.notifier.show("خطأ", "يرجى إدخال بريد إلكتروني صحيح", "warning");
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show("خطأ", "يرجى إدخال بريد إلكتروني صحيح", "warning");
+            }
             return;
         }
 
@@ -1143,7 +1707,9 @@ class App {
                 btn.disabled = false;
                 btn.innerText = 'دخول للوحة التحكم';
             }
-            window.notifier.show("خطأ", "انتهت مهلة الانتظار. يرجى التحقق من اتصالك بالإنترنت ثم حاول مرة أخرى.", "error");
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show("خطأ", "انتهت مهلة الانتظار. يرجى التحقق من اتصالك بالإنترنت ثم حاول مرة أخرى.", "error");
+            }
         }, 8000);
 
         try {
@@ -1155,13 +1721,15 @@ class App {
                 ]);
             }
 
+            if (!window.db || !window.db.barbers) return;
+
             // Find or Create Barber
-            let barber = db.barbers.find(b => b.email === email);
+            let barber = window.db.barbers.find(b => b.email === email);
             let isNew = false;
 
             if (!barber) {
                 isNew = true;
-                const newId = db.barbers.length > 0 ? Math.max(...db.barbers.map(b => b.id)) + 1 : 1;
+                const newId = window.db.barbers.length > 0 ? Math.max(...window.db.barbers.map(b => b.id)) + 1 : 1;
                 barber = {
                     id: newId,
                     email: email,
@@ -1182,14 +1750,19 @@ class App {
                 if (barberUid) {
                     barber.barber_uid = barberUid;
                 }
-                db.barbers.push(barber);
-                window.saveDB(); // Persist changes
+                window.db.barbers.push(barber);
+                
+                if (window.saveDB && typeof window.saveDB === 'function') {
+                    window.saveDB();
+                }
             }
             else {
                 const barberUid = window.dbService && typeof window.dbService.getCustomerUid === 'function' ? window.dbService.getCustomerUid() : null;
                 if (barberUid && !barber.barber_uid) {
                     barber.barber_uid = barberUid;
-                    window.saveDB();
+                    if (window.saveDB && typeof window.saveDB === 'function') {
+                        window.saveDB();
+                    }
                 }
             }
 
@@ -1197,9 +1770,13 @@ class App {
             localStorage.setItem('barbergo_session', 'barber_' + barber.id);
 
             if (isNew) {
-                window.notifier.show("تم تفعيل حسابك", "تهانينا! لديك فترة تجربة مجانية لمدة 30 يوماً. قم بتعبئة بيانات صالونك الآن.", "success");
+                if (window.notifier && typeof window.notifier.show === 'function') {
+                    window.notifier.show("تم تفعيل حسابك", "تهانينا! لديك فترة تجربة مجانية لمدة 30 يوماً. قم بتعبئة بيانات صالونك الآن.", "success");
+                }
             } else {
-                window.notifier.show("مرحباً بك", `أهلاً بك مجدداً في لوحة التحكم يا ${barber.name}.`, "success");
+                if (window.notifier && typeof window.notifier.show === 'function') {
+                    window.notifier.show("مرحباً بك", `أهلاً بك مجدداً في لوحة التحكم يا ${barber.name}.`, "success");
+                }
             }
 
             this.askPushNotificationsPermission();
@@ -1215,13 +1792,17 @@ class App {
                 btn.disabled = false;
                 btn.innerText = 'دخول للوحة التحكم';
             }
-            console.error('Barber email verification error:', err);
-            window.notifier.show("خطأ", "حدث خطأ أثناء التحقق من البريد الإلكتروني. تحقق من اتصالك بالإنترنت وحاول مرة أخرى.", "error");
+            console.error('[App] Barber email verification error:', err);
+            if (window.notifier && typeof window.notifier.show === 'function') {
+                window.notifier.show("خطأ", "حدث خطأ أثناء التحقق من البريد الإلكتروني. تحقق من اتصالك بالإنترنت وحاول مرة أخرى.", "error");
+            }
         }
     }
 
     sendSubscriptionAlert(barberName) {
-        window.notifier.show("تم الإرسال", `تم إرسال تنبيه تجديد الاشتراك لصالون: ${barberName}`, "success");
+        if (window.notifier && typeof window.notifier.show === 'function') {
+            window.notifier.show("تم الإرسال", `تم إرسال تنبيه تجديد الاشتراك لصالون: ${barberName}`, "success");
+        }
     }
 
     // Voice Search
@@ -1687,9 +2268,96 @@ class App {
     }
 }
 
-// Strict initialization: Ensure App is created exactly once after DOM is ready
-window.addEventListener('DOMContentLoaded', () => {
-    if (!window.app) {
+// ============================================================================
+// CRITICAL: Bootstrap with bulletproof error handling and dependency waiting
+// ============================================================================
+async function 
+
+
+waitForBootstrapDependencies() {
+    const requiredChecks = [
+        () => document.readyState === 'interactive' || document.readyState === 'complete',
+        () => !!document.getElementById('app'),
+        () => window.UI && typeof window.UI === 'object',
+        () => window.notifier && typeof window.notifier.show === 'function'
+    ];
+
+    const deadline = Date.now() + 2000;
+    while (Date.now() < deadline) {
+        if (requiredChecks.every(check => {
+            try {
+                return check();
+            } catch (err) {
+                return false;
+            }
+        })) {
+            return;
+        }
+        await new Promise(resolve => setTimeout(resolve, 50));
+    }
+}
+
+window.addEventListener('DOMContentLoaded', async () => {
+    window.forceBarberGoUI?.();
+    const forceUIFallback = setTimeout(() => window.forceBarberGoUI?.(), 900);
+
+    if (window.app) {
+        clearTimeout(forceUIFallback);
+        return; // Already initialized
+    }
+    
+    try {
+        console.log('⏳ Waiting for bootstrap dependencies...');
+        
+        // Wait for all required globals to be ready
+        await waitForBootstrapDependencies();
+        
+        // Verify critical globals with fallbacks
+        if (!window.db) {
+            console.warn('⚠️ window.db missing - initializing defaults');
+            window.db = { barbers: [], services: [], products: [], bookings: [], notifications: [] };
+        }
+        
+        if (!window.UI) {
+            console.error('🔴 CRITICAL: window.UI is still undefined - UI components failed to load');
+            // Create minimal fallback UI
+            window.UI = {
+                renderLoadingPlaceholder: (msg) => `<div style="text-align:center;padding:50px;color:#fff;background:#000;">${msg}</div>`
+            };
+        }
+        
+        if (!window.notifier) {
+            console.warn('⚠️ window.notifier missing - creating minimal fallback');
+            window.notifier = {
+                show: (title, msg) => console.log(`[NOTIF] ${title}: ${msg}`)
+            };
+        }
+        
+        if (!window.dbService) {
+            console.warn('⚠️ window.dbService missing - Firebase service may have failed');
+        }
+        
+        console.log('✅ Starting App initialization');
         window.app = new App();
+        window.forceBarberGoUI?.();
+        clearTimeout(forceUIFallback);
+        console.log('✅ App initialized successfully');
+    } catch (error) {
+        console.error('🔴 FATAL: App initialization failed:', error);
+        // Render emergency fallback
+        const appEl = document.getElementById('app');
+        if (appEl) {
+            appEl.innerHTML = `
+                <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#000;color:#fff;font-family:Arial,sans-serif;padding:20px;text-align:center;">
+                    <div>
+                        <h1 style="font-size:1.5rem;margin:0 0 20px 0;">⚠️ تحذير تقني</h1>
+                        <p style="margin:0 0 10px 0;font-size:0.95rem;">حدث خطأ في تحميل التطبيق</p>
+                        <p style="margin:0 0 20px 0;font-size:0.85rem;color:#ccc;">حاول تحديث الصفحة أو امسح ذاكرة التخزين المؤقت</p>
+                        <button onclick="location.reload()" style="padding:10px 20px;background:#ffd700;color:#000;border:none;border-radius:5px;cursor:pointer;font-weight:bold;">إعادة تحميل</button>
+                    </div>
+                </div>
+            `;
+        }
+        throw error; // Re-throw so console shows full error
     }
 });
