@@ -51,6 +51,17 @@
     <!-- Main app - loaded LAST with defer to ensure all dependencies are ready -->
     <!-- NOTE: This is a regular script (not module) with defer to prevent execution before dependencies -->
     <script src="app.js?v=2.0.0" defer></script>
+    <script>
+  window.addEventListener('load', function() {
+    setTimeout(function() {
+      var app = document.getElementById('app');
+      if (app && app.innerHTML.trim() === "") {
+        app.style.display = 'none';
+        console.log("Safety fallback: Loading screen removed.");
+      }
+    }, 5000);
+  });
+</script>
 </body>
 
 </html>
