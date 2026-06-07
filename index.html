@@ -26,74 +26,15 @@
     <!-- Main CSS -->
     <link rel="stylesheet" href="./styles.css">
 </head>
-
+    
 <body>
-    <div id="app"></div>
-    <div id="toast-container"></div>
+    <div id="app" style="display: block !important; visibility: visible !important; opacity: 1 !important;">
+        </div>
 
-    <!-- CRITICAL: Load all dependencies FIRST with defer to ensure proper ordering -->
-    <!-- Firebase must be first (module), other scripts are regular with defer -->
-    <script type="module" src="./firebase-service.js" defer></script>
-    
-    <!-- Notifications system - required for UI fallbacks -->
-    <script src="./notifications.js" defer></script>
-    
-    <!-- Data persistence layer -->
-    <script src="./data.js" defer></script>
-    
-    <!-- Component libraries - lazy-load for performance -->
-    <script src="./component-header.js" defer></script>
-    <script src="./component-loginform.js" defer></script>
-    
-    <!-- UI components - MUST load before app.js -->
-    <script src="./ui-components.js" defer></script>
-    
-    <!-- Main app - loaded LAST with defer to ensure all dependencies are ready -->
-    <!-- NOTE: This is a regular script (not module) with defer to prevent execution before dependencies -->
-    <script src="./app.js" defer></script>
-
-    <!-- Safety: Force #app visible immediately and on load to prevent stuck black screen -->
-    <script>
-        (function () {
-            const forceShowApp = () => {
-                try {
-                    const appEl = document.getElementById('app');
-                    if (appEl) {
-                        appEl.style.setProperty('display', 'block', 'important');
-                        appEl.style.visibility = 'visible';
-                        appEl.style.opacity = '1';
-                        appEl.style.pointerEvents = 'auto';
-                    }
-
-                    if (document.body) {
-                        document.body.style.display = 'block';
-                        document.body.style.visibility = 'visible';
-                        document.body.style.opacity = '1';
-                    }
-
-                    // Hide known splash selectors if they exist (do not alter core CSS files)
-                    const hideSelectors = ['#loading', '.loading-screen', '.splash', '.preloader', '.app-loading'];
-                    hideSelectors.forEach(sel => {
-                        try {
-                            const el = document.querySelector(sel);
-                            if (el) {
-                                el.style.display = 'none';
-                                el.style.visibility = 'hidden';
-                            }
-                        } catch (e) {}
-                    });
-
-                    console.info('[Safety] Forced #app visible');
-                } catch (err) {
-                    console.warn('[Safety] forceShowApp failed', err);
-                }
-            };
-
-            forceShowApp();
-            window.addEventListener('DOMContentLoaded', forceShowApp);
-            window.addEventListener('load', forceShowApp);
-        })();
-    </script>
+    <script type="module" src="./firebase-service.js"></script>
+    <script src="./notifications.js"></script>
+    <script src="./data.js"></script>
+    <script src="./app.js?v=2.0.0"></script>
 </body>
 
 </html>
