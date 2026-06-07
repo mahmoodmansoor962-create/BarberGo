@@ -52,20 +52,46 @@
     <!-- NOTE: This is a regular script (not module) with defer to prevent execution before dependencies -->
     <script src="/app.js?v=2.0.0" defer></script>
 
-    <!-- Safety Fallback: Hide stuck loading/app screen after 3 seconds -->
+    <!-- Safety: Force #app visible immediately and on load to prevent stuck black screen -->
     <script>
         (function () {
-            const hideAppContainer = () => {
-                const appEl = document.getElementById('app');
-                if (!appEl) return;
-                appEl.style.setProperty('display', 'none', 'important');
-                appEl.style.visibility = 'hidden';
-                appEl.style.opacity = '0';
-                appEl.style.pointerEvents = 'none';
-                console.warn('[Safety Fallback] #app hidden after timeout to prevent persistent black screen.');
+            const forceShowApp = () => {
+                try {
+                    const appEl = document.getElementById('app');
+                    if (appEl) {
+                        appEl.style.setProperty('display', 'block', 'important');
+                        appEl.style.visibility = 'visible';
+                        appEl.style.opacity = '1';
+                        appEl.style.pointerEvents = 'auto';
+                    }
+
+                    if (document.body) {
+                        document.body.style.display = 'block';
+                        document.body.style.visibility = 'visible';
+                        document.body.style.opacity = '1';
+                    }
+
+                    // Hide known splash selectors if they exist (do not alter core CSS files)
+                    const hideSelectors = ['#loading', '.loading-screen', '.splash', '.preloader', '.app-loading'];
+                    hideSelectors.forEach(sel => {
+                        try {
+                            const el = document.querySelector(sel);
+                            if (el) {
+                                el.style.display = 'none';
+                                el.style.visibility = 'hidden';
+                            }
+                        } catch (e) {}
+                    });
+
+                    console.info('[Safety] Forced #app visible');
+                } catch (err) {
+                    console.warn('[Safety] forceShowApp failed', err);
+                }
             };
 
-            setTimeout(hideAppContainer, 3000);
+            forceShowApp();
+            window.addEventListener('DOMContentLoaded', forceShowApp);
+            window.addEventListener('load', forceShowApp);
         })();
     </script>
 </body>
