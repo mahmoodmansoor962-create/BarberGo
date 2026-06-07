@@ -51,17 +51,23 @@
     <!-- Main app - loaded LAST with defer to ensure all dependencies are ready -->
     <!-- NOTE: This is a regular script (not module) with defer to prevent execution before dependencies -->
     <script src="app.js?v=2.0.0" defer></script>
+
+    <!-- Safety Fallback: Hide stuck loading/app screen after 3 seconds -->
     <script>
-  window.addEventListener('load', function() {
-    setTimeout(function() {
-      var app = document.getElementById('app');
-      if (app && app.innerHTML.trim() === "") {
-        app.style.display = 'none';
-        console.log("Safety fallback: Loading screen removed.");
-      }
-    }, 5000);
-  });
-</script>
+        (function () {
+            const hideAppContainer = () => {
+                const appEl = document.getElementById('app');
+                if (!appEl) return;
+                appEl.style.setProperty('display', 'none', 'important');
+                appEl.style.visibility = 'hidden';
+                appEl.style.opacity = '0';
+                appEl.style.pointerEvents = 'none';
+                console.warn('[Safety Fallback] #app hidden after timeout to prevent persistent black screen.');
+            };
+
+            setTimeout(hideAppContainer, 3000);
+        })();
+    </script>
 </body>
 
 </html>
