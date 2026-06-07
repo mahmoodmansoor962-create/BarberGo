@@ -1,6 +1,8 @@
 // ================================================================================
-// BarberGo Application Logic & Component Router - BULLETPROOF ARCHITECTURE
 // ================================================================================
+// BarberGo Application Logic & Component Router - BULLETPROOF ARCHITECTURE
+;(function GLOBAL_APP_WRAPPER(){
+    try {
 // DESIGN PRINCIPLE: UI renders INSTANTLY. Database operations occur silently
 // in the background. Network delays NEVER cause black screens or unresponsive UX.
 // ================================================================================
@@ -261,6 +263,21 @@ window._backgroundBootstrap.execute().catch(err => {
     console.error('[BGP] Unhandled error in background bootstrap:', err);
 });
 
+    } catch (err) {
+        console.error('[GLOBAL APP ERROR]', err);
+        try {
+            const appEl = document.getElementById('app');
+            if (appEl) {
+                appEl.style.display = 'block';
+                appEl.style.visibility = 'visible';
+                appEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#000;color:#fff;padding:20px;text-align:center;">\n                    <div>\n                        <h2 style="margin:0 0 10px 0;">⚠️ خطأ في التطبيق</h2>\n                        <p style="margin:0 0 10px 0;">حدث خطأ أثناء تشغيل الواجهة. الرجاء إعادة تحميل الصفحة.</p>\n                        <button onclick="location.reload()" style="padding:8px 14px;background:#ffd700;border-radius:6px;border:none;cursor:pointer;font-weight:bold;">إعادة تحميل</button>\n                    </div>\n                </div>';
+            }
+        } catch (e) {
+            console.error('Failed to render global error fallback:', e);
+        }
+    }
+})();
+
 // ================================================================================
 // MAIN APPLICATION CLASS - Renders UI Immediately, Defers DB Operations
 // ================================================================================
@@ -345,23 +362,15 @@ class App {
 
     renderInitialDarkShell() {
         if (!this.appElement) return;
-        
-        // Set styles for dark shell container
-        this.appElement.style.backgroundColor = '#000000';
-        this.appElement.style.minHeight = '100vh';
-        this.appElement.style.color = '#ffffff';
-        this.appElement.style.display = 'flex';
-        this.appElement.style.alignItems = 'center';
-        this.appElement.style.justifyContent = 'center';
-        this.appElement.innerHTML = `
-            <div style="text-align: center; opacity: 0.8;">
-                <div style="font-size: 3rem; margin-bottom: 20px;">💈</div>
-                <div style="font-size: 1.2rem; letter-spacing: 2px;">BARBERGO</div>
-                <div style="font-size: 0.85rem; margin-top: 15px; color: #999;">
-                    جاري تحميل...
-                </div>
-            </div>
-        `;
+
+        // Keep the root visible but avoid a blocking full-screen loading shell.
+        this.appElement.style.display = 'block';
+        this.appElement.style.visibility = 'visible';
+        this.appElement.style.opacity = '1';
+        // Do not inject a large dark loading screen; leave content rendering to the app.
+        if (!this.appElement.innerHTML || this.appElement.innerHTML.trim().length < 10) {
+            this.appElement.innerHTML = '';
+        }
     }
 
     ensureInitialDarkShell() {
@@ -639,7 +648,7 @@ class App {
     async registerServiceWorker() {
         if (!('serviceWorker' in navigator)) return;
         try {
-            const registration = await navigator.serviceWorker.register(`/sw.js?v=${this.buildId}`, { scope: '/' });
+            const registration = await navigator.serviceWorker.register(`./sw.js?v=${this.buildId}`, { scope: '/' });
             this.serviceWorkerRegistered = true;
             console.info('[App] Service Worker registered:', registration.scope);
             if (registration && registration.update) {
