@@ -2338,6 +2338,18 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
         
         console.log('✅ Starting App initialization');
+        // Ensure a root #app container exists (defensive for some production routes)
+        try {
+            if (!document.getElementById('app')) {
+                const root = document.createElement('div');
+                root.id = 'app';
+                document.body.insertBefore(root, document.body.firstChild || null);
+                console.warn('[Init] #app was missing, created a fallback root container.');
+            }
+        } catch (e) {
+            console.warn('[Init] Could not ensure #app container:', e);
+        }
+
         window.app = new App();
         window.forceBarberGoUI?.();
         clearTimeout(forceUIFallback);
