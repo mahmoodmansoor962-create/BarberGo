@@ -1,41 +1,30 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
     <title>BarberGo - منصة الحجز الذكية</title>
-    
     <style>
-        body { background-color: #000000 !important; margin: 0; padding: 0; }
+        /* فرض ظهور الخلفية فوراً */
+        body { background-color: #000000 !important; margin: 0; padding: 0; overflow-x: hidden; }
         #app { display: block !important; visibility: visible !important; opacity: 1 !important; min-height: 100vh; }
     </style>
-
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='0.9em' font-size='90'%3E%F0%9F%92%88%3C/text%3E%3C/svg%3E">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="manifest" href="./manifest.json">
-    <meta name="theme-color" content="#000000">
     <link rel="stylesheet" href="./styles.css">
 </head>
-
 <body>
     <div id="app"></div>
 
-    <script type="module" src="./firebase-service.js"></script>
+    <script src="./firebase-service.js"></script>
     <script src="./notifications.js"></script>
     <script src="./data.js"></script>
-    
     <script src="./app.js?v=2.0.0"></script>
 
     <script>
         window.addEventListener('load', () => {
             const app = document.getElementById('app');
+            // تأكيد الظهور بعد اكتمال التحميل
             if(app) {
                 app.style.display = 'block';
-                app.style.visibility = 'visible';
                 app.style.opacity = '1';
             }
         });
