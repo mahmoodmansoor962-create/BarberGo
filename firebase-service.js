@@ -1,27 +1,61 @@
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-import {
-  initializeFirestore,
-  getFirestore,
-  enableIndexedDbPersistence,
-  collection,
-  query,
-  where,
-  getDocs,
-  onSnapshot,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
-  serverTimestamp,
-  arrayRemove
-} from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
-import {
-  getAuth,
-  signInAnonymously,
-  onAuthStateChanged,
-  setPersistence,
-  browserLocalPersistence
-} from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+// BarberGo Firebase Service — loaded as a plain <script> (no type="module" needed).
+// Firebase SDK is imported via dynamic import() which works in all modern browsers
+// without requiring the script tag to carry type="module".
+(async function () {
+  'use strict';
+
+  // ── Dynamic imports (replaces ES module `import` statements) ──────────────
+  let initializeApp, initializeFirestore, enableIndexedDbPersistence,
+      collection, query, where, getDocs, onSnapshot, addDoc, updateDoc,
+      deleteDoc, doc, serverTimestamp, arrayRemove,
+      getAuth, signInAnonymously, onAuthStateChanged, setPersistence,
+      browserLocalPersistence;
+
+  try {
+    ({ initializeApp }                      = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js'));
+    ({ initializeFirestore, enableIndexedDbPersistence,
+       collection, query, where, getDocs, onSnapshot,
+       addDoc, updateDoc, deleteDoc, doc, serverTimestamp,
+       arrayRemove }                         = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js'));
+    ({ getAuth, signInAnonymously, onAuthStateChanged,
+       setPersistence, browserLocalPersistence } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js'));
+  } catch (sdkErr) {
+    console.warn('[firebase-service] Firebase SDK failed to load — running in mock mode.', sdkErr);
+    // Provide a no-op dbService so the rest of the app doesn't crash
+    window.dbService = _buildMockService();
+    return;
+  }
+
+  // ── Helper: minimal mock service used when SDK or config is unavailable ───
+  function _buildMockService() {
+    return {
+      useRealFirebase: false,
+      customerUid: null,
+      getCustomerUid() {
+        let uid = localStorage.getItem('barbergo_customer_uid');
+        if (!uid) { uid = `local_${Math.random().toString(36).slice(2)}_${Date.now()}`; localStorage.setItem('barbergo_customer_uid', uid); }
+        this.customerUid = uid;
+        if (!localStorage.getItem('barbergo_session')) localStorage.setItem('barbergo_session', 'client');
+        return uid;
+      },
+      async ensureAuthReady() { return this.getCustomerUid(); },
+      async fetchInitialCollections() { return {}; },
+      subscribeToBookings(barberId, cb) { return () => {}; },
+      async bookAppointment(data) {
+        const booking = { id: Date.now(), status: 'pending', ...data, customer_uid: this.getCustomerUid() };
+        if (window.db) { window.db.bookings = window.db.bookings || []; window.db.bookings.push(booking); window.saveDB?.(); }
+        return booking;
+      },
+      async saveCustomerNotification(n) { return n; },
+      async addBarberRating(id, r) { return r; },
+      async updateService() { return true; },
+      async deleteService() { return true; },
+      async removeServiceFromBarber() { return true; },
+      scheduleFeedbackNotificationForBooking() {},
+      scheduleFeedbackNotifications() {},
+      initFeedbackScheduler() {},
+    };
+  }
 
 class DatabaseService {
   constructor() {
@@ -454,4 +488,6 @@ class DatabaseService {
   }
 }
 
-window.dbService = new DatabaseService();
+  window.dbService = new DatabaseService();
+
+})(); // end of async IIFE — firebase-service.js
