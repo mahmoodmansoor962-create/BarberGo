@@ -270,13 +270,16 @@ window._backgroundBootstrap.execute().catch(err => {
             if (appEl) {
                 appEl.style.display = 'block';
                 appEl.style.visibility = 'visible';
-                appEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#000;color:#fff;padding:20px;text-align:center;">\n                    <div>\n                        <h2 style="margin:0 0 10px 0;">⚠️ خطأ في التطبيق</h2>\n                        <p style="margin:0 0 10px 0;">حدث خطأ أثناء تشغيل الواجهة. الرجاء إعادة تحميل الصفحة.</p>\n                        <button onclick="location.reload()" style="padding:8px 14px;background:#ffd700;border-radius:6px;border:none;cursor:pointer;font-weight:bold;">إعادة تحميل</button>\n                    </div>\n                </div>';
+                appEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#000;color:#fff;padding:20px;text-align:center;"><div><h2 style="margin:0 0 10px 0;">⚠️ خطأ في التطبيق</h2><p style="margin:0 0 10px 0;">حدث خطأ أثناء تشغيل الواجهة. الرجاء إعادة تحميل الصفحة.</p><button onclick="location.reload()" style="padding:8px 14px;background:#ffd700;border-radius:6px;border:none;cursor:pointer;font-weight:bold;">إعادة تحميل</button></div></div>';
             }
         } catch (e) {
             console.error('Failed to render global error fallback:', e);
         }
     }
 })();
+// ── App class, waitForBootstrapDependencies & DOMContentLoaded are intentionally
+//    defined here at global scope so they are never silently swallowed by the
+//    GLOBAL_APP_WRAPPER catch block above.
 
 // ================================================================================
 // MAIN APPLICATION CLASS - Renders UI Immediately, Defers DB Operations
@@ -522,7 +525,18 @@ class App {
 
         // Safety check: UI library must be available
         if (!window.UI || typeof window.UI !== 'object') {
-            this.appElement.innerHTML = '<div style="padding: 40px; text-align: center; color: #ccc;">UI library not loaded. Please refresh the page.</div>';
+            console.error('[App] window.UI is not defined — data.js or UI script failed to load.');
+            if (this.appElement) {
+                this.appElement.innerHTML = `
+                    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#000;color:#fff;font-family:Arial,sans-serif;padding:20px;text-align:center;">
+                        <div>
+                            <h2 style="color:#ffd700;margin:0 0 12px 0;">⚠️ خطأ في تحميل الواجهة</h2>
+                            <p style="margin:0 0 8px 0;font-size:0.9rem;">فشل تحميل ملف الواجهة (data.js أو UI script).</p>
+                            <p style="margin:0 0 20px 0;font-size:0.8rem;color:#aaa;">تحقق من وجود الملفات وتطابق المسارات في index.html</p>
+                            <button onclick="location.reload()" style="padding:10px 22px;background:#ffd700;color:#000;border:none;border-radius:6px;cursor:pointer;font-weight:bold;font-size:1rem;">إعادة تحميل</button>
+                        </div>
+                    </div>`;
+            }
             return;
         }
 
@@ -2280,10 +2294,7 @@ class App {
 // ============================================================================
 // CRITICAL: Bootstrap with bulletproof error handling and dependency waiting
 // ============================================================================
-async function 
-
-
-waitForBootstrapDependencies() {
+async function waitForBootstrapDependencies() {
     const requiredChecks = [
         () => document.readyState === 'interactive' || document.readyState === 'complete',
         () => !!document.getElementById('app'),
