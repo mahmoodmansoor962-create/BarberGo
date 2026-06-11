@@ -40,9 +40,40 @@
       },
       async ensureAuthReady() { return this.getCustomerUid(); },
       async fetchInitialCollections() { return {}; },
-      subscribeToBookings(barberId, cb) { return () => {}; },
-      async bookAppointment(data) {
-        const booking = { id: Date.now(), status: 'pending', ...data, customer_uid: this.getCustomerUid() };
+      // استبدل الجزء المظلل وكل الدوال التي تعمل في وضع المحاكاة بهذا:
+
+async subscribeToBookings(barberId, callback) {
+    const bookingsQuery = query(collection(this.db, 'bookings'), where('barber_id', '==', barberId));
+    return onSnapshot(bookingsQuery, snapshot => {
+      const changes = snapshot.docChanges().map(change => ({
+        type: change.type,
+        data: { id: change.doc.id, ...change.doc.data() }
+      }));
+      callback(changes);
+    });
+  } // <--- تأكد من وجود هذا القوس لإغلاق الدالة
+
+  async bookAppointment(data) {
+    await this.ensureAuthReady();
+    const docRef = await addDoc(collection(this.db, 'bookings'), {
+      ...data,
+      customer_uid: this.getCustomerUid(),
+      status: 'pending',
+      createdAt: serverTimestamp()
+    });
+    return { id: docRef.id, ...data };
+  } // <--- تأكد من وجود هذا القوس لإغلاق الدالة
+  async bookAppointment(data) {
+    // هذا الكود يقوم بحفظ الموعد في قاعدة بياناتك الحقيقية
+    await this.ensureAuthReady();
+    const docRef = await addDoc(collection(this.db, 'bookings'), {
+      ...data,
+      customer_uid: this.getCustomerUid(),
+      status: 'pending',
+      createdAt: serverTimestamp()
+    });
+    return { id: docRef.id, ...data };
+  }
         if (window.db) { window.db.bookings = window.db.bookings || []; window.db.bookings.push(booking); window.saveDB?.(); }
         return booking;
       },
