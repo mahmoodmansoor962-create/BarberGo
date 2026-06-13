@@ -1,9 +1,0 @@
-[debug] [2026-05-17T16:50:59.201Z] ----------------------------------------------------------------------
-[debug] [2026-05-17T16:50:59.203Z] Command:       /usr/local/share/nvm/versions/node/v24.14.0/bin/node /home/codespace/nvm/current/bin/firebase login --no-localhost
-[debug] [2026-05-17T16:50:59.204Z] CLI Version:   15.18.0
-[debug] [2026-05-17T16:50:59.204Z] Platform:      linux
-[debug] [2026-05-17T16:50:59.204Z] Node Version:  v24.14.0
-[debug] [2026-05-17T16:50:59.204Z] Time:          Sun May 17 2026 16:50:59 GMT+0000 (Coordinated Universal Time)
-[debug] [2026-05-17T16:50:59.204Z] ----------------------------------------------------------------------
-[debug] 
-[info] i  The Firebase CLI’s MCP server feature can optionally make use of Gemini in Firebase. Learn more about Gemini in Firebase and how it uses your data: https://firebase.google.com/docs/gemini-in-firebase#how-gemini-in-firebase-uses-your-data 
